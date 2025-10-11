@@ -24,7 +24,7 @@ library(dplyr)
 # dim(dbl)
 # # Sex is stored in PTGENDER
 # table(dbl$PTGENDER)
-# jd <- pacc(dbl, keepComponents = FALSE)
+jd <- pacc(adnimerge, keepComponents = FALSE)
 
 
 ## List of columns of interest
@@ -94,26 +94,35 @@ npi$VISCODE <- as.character(npi$VISCODE)
 medhist$VISCODE <- as.character(medhist$VISCODE)
 gdscale$VISCODE <- as.character(gdscale$VISCODE)
 
+## do the Pacc calculations
+dd <- adnimerge %>%
+  select(ADASQ4, LDELTOTAL, DIGITSCOR, MMSE, TRABSCOR, DX.bl, VISCODE, RID, PTID)
+
+adni_pacc <- pacc(dd, keepComponents = FALSE)
+dim(adni_pacc)
+head(adni_pacc, 10)
+colnames(adni_pacc)
+
+
 ##Subset the columns of interest from each dataset so that it's easier to merge for me
+# sub_adni_pacc <- adni_pacc %>%
+#   select(RID, VISCODE, PACC)
+
 sub_adnimerge <- adnimerge %>%
-  select(RID, 
-#PTID, #VISCODE, 
+  select(RID, PTID, VISCODE, DX, DX.bl,
   PTMARRY, PTETHCAT, PTEDUCAT, PTGENDER, APOE4)
 
 ##Baseline data from CVRF for diabetes 
 sub_cvrf <- cvrf %>%
-  select(RID, 
-  #VISCODE, PTID, 
+  select(RID,  VISCODE, PTID, 
   PHC_BMI, PHC_Diabetes, PHC_Smoker, PHC_SBP)
 
 # sub_npi <- npi %>%
-#   select(RID, 
-#   #VISCODE, 
+#   select(RID, VISCODE, 
 #   NPIK, NPIK1, NPIK2, NPIK3, NPIK4, NPIK5, NPIK6, NPIK7, NPIK8, NPIK9A, NPIK9B, NPIK9C, NPIKTOT)
 
 sub_zhang <- zhang %>%  
-  select(RID, 
-  #VISCODE, 
+  select(RID, VISCODE, 
   FINAL_HGB, RUNDATE_HGB)
 
 ## baseline values for GDS15
@@ -132,22 +141,21 @@ sub_admcgctof <- admcgctof %>%
   select(RID, CAFFEINE, CHOLESTEROL)
 
 sub_adni1lipidomicsrader <- adni1lipidomicsrader %>%
-  select(RID, 
-  #VISCODE, 
-  CHOL, HDL)
+  select(RID, VISCODE, CHOL, HDL)
 
 
 ## join them all together
 master_df <- sub_adnimerge %>%
-  inner_join(sub_gdscale, by = c("RID")) %>%
-  inner_join(sub_npi, by = c("RID")) %>%
-  inner_join(sub_medhist, by = c("RID")) %>%
-  inner_join(sub_zhang, by = c("RID")) %>%
-  inner_join(sub_cvrf, by = c("RID")) %>%
-  inner_join(adni1lipidomicsrader, by = c("RID")) %>%
-  inner_join(sub_admcgctof, by = c("RID"))
+  # left_join(sub_gdscale, by = c("RID")) %>%
+  # left_join(sub_npi, by = c("RID")) %>%
+  # left_join(sub_medhist, by = c("RID")) %>%
+  left_join(sub_zhang, by = c("RID", "VISCODE")) %>%
+  left_join(sub_cvrf, by = c("RID", "VISCODE")) %>%
+  left_join(adni1lipidomicsrader, by = c("RID", "VISCODE")) %>%
+  left_join(sub_admcgctof, by = c("RID"))
+  left_join(adni_pacc, by = c("RID", "VISCODE"))
 
-dim(master_df) ## 436027 rows
+dim(master_df) ## 16633 rows
 
 write.csv(master_df, "data/master_df_raw.csv", row.names = FALSE)
 
@@ -155,8 +163,8 @@ write.csv(master_df, "data/master_df_raw.csv", row.names = FALSE)
 master_df <- master_df %>%
   distinct()  # keeps only unique rows
 
-dim(master_df) ## 8946 rows 
-length(unique(master_df$RID)) ## 351 patients
+dim(master_df) ## 16633 rows 
+length(unique(master_df$RID)) ## 2436 patients
 
 ### We want to allow for missigness for the individual analyiss in the final dataset (lmer)
 ### three different data groups AD is alzheirmer, CN for cognitive normal, and MCI for mild cognitive impairment
@@ -171,4 +179,29 @@ length(unique(master_df$RID)) ## 351 patients
 ## some datasets dont have bl for baseline and may have screening visits
 ## check the missingss in each dataset
 
-head(adnimerge, 2)
+## High chol is measured as > 200 mg/dL everything else is considered normal
+## Diabetes is measured as 1 for yes and 0 for no if a patient has diabetes then it will count as a risk factor
+## BMI is classified as obesity (≥30 kg/m²) or no obesity (<30 kg/m²) as a risk factor
+## High blood pressure is defined at baseline as a single measurement with systolic blood pressure >140 mmHg or diastolic blood pressure >90 mmHg.
+## PTEducat >12 years is high, else is Low
+
+##Learn.Normal means that there is no risk factor for AD
+##A4.Normal means that there is a cognitive impairment with no risk factors for AD
+##A4.High means that there is a cognitive impairment with at least one risk factor for AD
+##Learn.High means that there is no cognitive impairment with at least one risk factor for AD
+
+
+### Develop a function to classify the risk factors based on measurements for chol, BMI, diabetes, and SBP
+## turn risk factotrs into high or normal for patients
+
+master_df$Chol_group <- ifelse(master_df$CHOL > 200, "High", "Normal")
+master_df$Diabetes_group <- ifelse(master_df$PHC_Diabetes == 1, "Yes", "No")
+master_df$BMI_group <- ifelse(master_df$PHC_BMI >= 30, "Obese", "No Obesity")
+master_df$SBP_group <- ifelse(master_df$PHC_SBP > 140, "High", "Normal")
+master_df$PTEDUCAT_group <- ifelse(master_df$PTEDUCAT > 12, "High", "Low")
+
+head(master_df, 5)
+dim(master_df)
+
+
+##Create new variables for A4.Learn and A4.Normal based on the risk factors for G1-G4
