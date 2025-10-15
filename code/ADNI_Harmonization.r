@@ -1,13 +1,15 @@
 ##Pakcages and information needed for the analysis
-# install.packages("Hmisc")
-# library(Hmisc)
-# install.packages("ADNI/ADNIMERGE", repos = NULL, type = "source")
+install.packages("Hmisc")
+library(Hmisc)
+install.packages("ADNIMERGE", repos = NULL, type = "source")
 # help(package = "ADNIMERGE")
-# install.packages("yardstick")
+install.packages("yardstick")
 # pacc(dbl, keepComponents = FALSE)
 library(dplyr)
+library(yardstick)
+library(ADNIMERGE)
+library(tidyr)
 
-# library(ADNIMERGE)
 # data(adnimerge)
 # data(adas)
 
@@ -100,13 +102,13 @@ dd <- adnimerge %>%
 
 adni_pacc <- pacc(dd, keepComponents = FALSE)
 dim(adni_pacc)
-head(adni_pacc, 10)
+head(adni_pacc, 5)
 colnames(adni_pacc)
 
 
 ##Subset the columns of interest from each dataset so that it's easier to merge for me
-# sub_adni_pacc <- adni_pacc %>%
-#   select(RID, VISCODE, PACC)
+sub_adni_pacc <- adni_pacc %>%
+  select(RID, VISCODE, ADASQ4, LDELTOTAL, DIGITSCOR, MMSE, TRABSCOR, mPACCdigit, mPACCtrailsB)
 
 sub_adnimerge <- adnimerge %>%
   select(RID, PTID, VISCODE, DX, DX.bl,
@@ -152,10 +154,11 @@ master_df <- sub_adnimerge %>%
   left_join(sub_zhang, by = c("RID", "VISCODE")) %>%
   left_join(sub_cvrf, by = c("RID", "VISCODE")) %>%
   left_join(adni1lipidomicsrader, by = c("RID", "VISCODE")) %>%
-  left_join(sub_admcgctof, by = c("RID"))
+  left_join(sub_admcgctof, by = c("RID")) %>%
   left_join(adni_pacc, by = c("RID", "VISCODE"))
 
 dim(master_df) ## 16633 rows
+colnames(master_df)
 
 write.csv(master_df, "data/master_df_raw.csv", row.names = FALSE)
 
@@ -185,11 +188,6 @@ length(unique(master_df$RID)) ## 2436 patients
 ## High blood pressure is defined at baseline as a single measurement with systolic blood pressure >140 mmHg or diastolic blood pressure >90 mmHg.
 ## PTEducat >12 years is high, else is Low
 
-##Learn.Normal means that there is no risk factor for AD
-##A4.Normal means that there is a cognitive impairment with no risk factors for AD
-##A4.High means that there is a cognitive impairment with at least one risk factor for AD
-##Learn.High means that there is no cognitive impairment with at least one risk factor for AD
-
 
 ### Develop a function to classify the risk factors based on measurements for chol, BMI, diabetes, and SBP
 ## turn risk factotrs into high or normal for patients
@@ -205,3 +203,70 @@ dim(master_df)
 
 
 ##Create new variables for A4.Learn and A4.Normal based on the risk factors for G1-G4
+##Learn.Normal means that there is no risk factor for AD
+##A4.Normal means that there is a cognitive impairment with no risk factors for AD
+##A4.High means that there is a cognitive impairment with at least one risk factor for AD
+##Learn.High means that there is no cognitive impairment with at least one risk factor for AD
+
+master_df <- read.csv("data/master_df_raw.csv")
+head(master_df, 5)
+
+unique(master_df$DX)
+
+# ### Categorize the DX.bl codes to show when a patient has a cognitive impairment and a risk factor for it
+# risk_factor_df <- master_df %>%
+#   mutate(Risk_Factor = ifelse(Chol_group == "High" | Diabetes_group == "Yes" | BMI_group == "Obese" | SBP_group == "High", "Yes", "No")) %>%
+#   mutate(A4_Category = case_when(
+#     DX.bl == "AD" & Risk_Factor == "Yes" ~ "A4.High",
+#     DX.bl == "AD" & Risk_Factor == "No" ~ "A4.Normal",
+#     DX.bl == "MCI" & Risk_Factor == "Yes" ~ "A4.High",
+#     DX.bl == "MCI" & Risk_Factor == "No" ~ "A4.Normal",
+#     DX.bl == "CN" & Risk_Factor == "Yes" ~ "Learn.High",
+#     DX.bl == "CN" & Risk_Factor == "No" ~ "Learn.Normal",
+#     TRUE ~ NA_character_
+#   ))
+
+# library(dplyr)
+
+risk_factor_df <- master_df %>%
+  mutate(
+    Chol_G4 = ifelse(Chol_group == "High", "Normal") & ,
+    Diabetes_G4   = ifelse(Diabetes_group == "Yes", "No"),
+    BMI_G4       = ifelse(BMI_group == "Obese", "No Obesity",
+    SBP_G4        = ifelse(SBP_group == "High", "Normal")
+  )
+head(risk_factor_df, 5)
+
+
+
+# library(dplyr)
+
+# risk_factor_df <- master_df %>%
+#   # Create separate G4 columns for each risk factor
+#   mutate(
+#     Chol_G4    = ifelse(Chol_group == "High", "Yes", "No"),
+#     Diabetes_G4 = ifelse(Diabetes_group == "Yes", "Yes", "No"),
+#     BMI_G4      = ifelse(BMI_group == "Obese", "Yes", "No"),
+#     SBP_G4      = ifelse(SBP_group == "High", "Yes", "No")
+#   ) %>%
+#   # Create a column for any risk factor in G4
+#   mutate(
+#     Any_Risk_G4 = ifelse(
+#       Chol_G4 == "Yes" | Diabetes_G4 == "Yes" | BMI_G4 == "Yes" | SBP_G4 == "Yes",
+#       "Yes",
+#       "No"
+#     )
+#   ) %>%
+#   # Categorize based on DX.bl and risk factors
+#   mutate(
+#     G4_Category = case_when(
+#       !is.na(DX.bl) & DX.bl %in% c("AD", "MCI", "Dementia") & Any_Risk_G4 == "Yes" ~ "A4.High",
+#       !is.na(DX.bl) & DX.bl %in% c("AD", "MCI", "Dementia") & Any_Risk_G4 == "No"  ~ "A4.Normal",
+#       !is.na(DX.bl) & DX.bl %in% c("AD", "MCI", "Dementia") & Any_Risk_G4 == "Yes" ~ "Learn.High",
+#       !is.na(DX.bl) & DX.bl %in% c("AD", "MCI", "Dementia") & Any_Risk_G4 == "No"  ~ "Learn.Normal",
+#       TRUE ~ NA_character_
+#     )
+#   )
+
+# # View the first 5 rows
+head(risk_factor_df, 5)
