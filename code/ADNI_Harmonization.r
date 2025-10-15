@@ -211,62 +211,52 @@ dim(master_df)
 master_df <- read.csv("data/master_df_raw.csv")
 head(master_df, 5)
 
-unique(master_df$DX)
-
-# ### Categorize the DX.bl codes to show when a patient has a cognitive impairment and a risk factor for it
-# risk_factor_df <- master_df %>%
-#   mutate(Risk_Factor = ifelse(Chol_group == "High" | Diabetes_group == "Yes" | BMI_group == "Obese" | SBP_group == "High", "Yes", "No")) %>%
-#   mutate(A4_Category = case_when(
-#     DX.bl == "AD" & Risk_Factor == "Yes" ~ "A4.High",
-#     DX.bl == "AD" & Risk_Factor == "No" ~ "A4.Normal",
-#     DX.bl == "MCI" & Risk_Factor == "Yes" ~ "A4.High",
-#     DX.bl == "MCI" & Risk_Factor == "No" ~ "A4.Normal",
-#     DX.bl == "CN" & Risk_Factor == "Yes" ~ "Learn.High",
-#     DX.bl == "CN" & Risk_Factor == "No" ~ "Learn.Normal",
-#     TRUE ~ NA_character_
-#   ))
+unique(master_df$DX.bl.x)
+unique(master_df$Diabetes_group)
+colnames(master_df)
 
 # library(dplyr)
 
 risk_factor_df <- master_df %>%
   mutate(
-    Chol_G4 = ifelse(Chol_group == "High", "Normal") & ,
-    Diabetes_G4   = ifelse(Diabetes_group == "Yes", "No"),
-    BMI_G4       = ifelse(BMI_group == "Obese", "No Obesity",
-    SBP_G4        = ifelse(SBP_group == "High", "Normal")
+    Chol_G4 = case_when(
+      DX.bl.x %in% c("CN", "MCI", "Dementia", "LMCI", "EMCI", "SMC" ) & Chol_group == "High" ~ "A4.High",
+      DX.bl.x %in% c("CN", "MCI", "Dementia", "LMCI", "EMCI", "SMC" ) & Chol_group == "Normal" ~ "A4.Normal",
+      DX.bl.x == "NA" & Chol_group == "High" ~ "Learn.High",
+      DX.bl.x == "NA" & Chol_group == "Normal" ~ "Learn.Normal",
+      TRUE ~ NA_character_
+    ),
+    Diabetes_G4 = case_when(
+      DX.bl.x %in% c("CN", "MCI", "Dementia", "LMCI", "EMCI", "SMC" ) & Diabetes_group == "Yes" ~ "A4.High",
+      DX.bl.x %in% c("CN", "MCI", "Dementia", "LMCI", "EMCI", "SMC" ) & Diabetes_group == "No" ~ "A4.Normal",
+      DX.bl.x == "NA" & Diabetes_group == "Yes" ~ "Learn.High",
+      DX.bl.x == "NA" & Diabetes_group == "No" ~ "Learn.Normal",
+      TRUE ~ NA_character_
+    ),
+    BMI_G4 = case_when(
+      DX.bl.x %in% c("CN", "MCI", "Dementia", "LMCI", "EMCI", "SMC" ) & BMI_group == "Obese" ~ "A4.High",
+      DX.bl.x %in% c("CN", "MCI", "Dementia", "LMCI", "EMCI", "SMC" ) & BMI_group == "No Obesity" ~ "A4.Normal",
+      DX.bl.x == "NA" & BMI_group == "Obese" ~ "Learn.High",
+      DX.bl.x == "NA" & BMI_group == "No Obesity" ~ "Learn.Normal",
+      TRUE ~ NA_character_
+    ),
+    SBP_G4 = case_when(
+      DX.bl.x %in% c("CN", "MCI", "Dementia", "LMCI", "EMCI", "SMC" ) & SBP_group == "High" ~ "A4.High",
+      DX.bl.x %in% c("CN", "MCI", "Dementia", "LMCI", "EMCI", "SMC" ) & SBP_group == "Normal" ~ "A4.Normal",
+      DX.bl.x == "NA" & SBP_group == "High" ~ "Learn.High",
+      DX.bl.x == "NA" & SBP_group == "Normal" ~ "Learn.Normal",
+      TRUE ~ NA_character_
+    ),
+    PTEDUCAT_G4 = case_when(
+      DX.bl.x %in% c("CN", "MCI", "Dementia", "LMCI", "EMCI", "SMC" ) & PTEDUCAT_group == "High" ~ "A4.High",
+      DX.bl.x %in% c("CN", "MCI", "Dementia", "LMCI", "EMCI", "SMC" ) & PTEDUCAT_group == "Low" ~ "A4.Normal",
+      DX.bl.x == "NA" & PTEDUCAT_group == "High" ~ "Learn.High",
+      DX.bl.x == "NA" & PTEDUCAT_group == "Low" ~ "Learn.Normal",
+      TRUE ~ NA_character_
+    )
   )
+
 head(risk_factor_df, 5)
-
-
-
-# library(dplyr)
-
-# risk_factor_df <- master_df %>%
-#   # Create separate G4 columns for each risk factor
-#   mutate(
-#     Chol_G4    = ifelse(Chol_group == "High", "Yes", "No"),
-#     Diabetes_G4 = ifelse(Diabetes_group == "Yes", "Yes", "No"),
-#     BMI_G4      = ifelse(BMI_group == "Obese", "Yes", "No"),
-#     SBP_G4      = ifelse(SBP_group == "High", "Yes", "No")
-#   ) %>%
-#   # Create a column for any risk factor in G4
-#   mutate(
-#     Any_Risk_G4 = ifelse(
-#       Chol_G4 == "Yes" | Diabetes_G4 == "Yes" | BMI_G4 == "Yes" | SBP_G4 == "Yes",
-#       "Yes",
-#       "No"
-#     )
-#   ) %>%
-#   # Categorize based on DX.bl and risk factors
-#   mutate(
-#     G4_Category = case_when(
-#       !is.na(DX.bl) & DX.bl %in% c("AD", "MCI", "Dementia") & Any_Risk_G4 == "Yes" ~ "A4.High",
-#       !is.na(DX.bl) & DX.bl %in% c("AD", "MCI", "Dementia") & Any_Risk_G4 == "No"  ~ "A4.Normal",
-#       !is.na(DX.bl) & DX.bl %in% c("AD", "MCI", "Dementia") & Any_Risk_G4 == "Yes" ~ "Learn.High",
-#       !is.na(DX.bl) & DX.bl %in% c("AD", "MCI", "Dementia") & Any_Risk_G4 == "No"  ~ "Learn.Normal",
-#       TRUE ~ NA_character_
-#     )
-#   )
-
-# # View the first 5 rows
-head(risk_factor_df, 5)
+colnames(risk_factor_df)
+dim(risk_factor_df) ## 16633 rows
+write.csv(risk_factor_df, "data/risk_factor_df_raw.csv", row.names = FALSE)
