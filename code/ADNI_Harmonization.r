@@ -76,6 +76,7 @@ admcgctof <- read.csv("data/ADMCGCTOF.csv")
 zhang <- read.csv("data/ZHANG.csv")
 cvrf <- read.csv("data/Assessment_Analyses/ADSP_PHC_CVRF_18Sep2025.csv")
 adni1lipidomicsrader <- read.csv("data/adni1lipidomicsrader.csv")
+pet <- read.csv("data/Image_Analyses/ADSP_PHC_PET_Amyloid_Simple_18Sep2025.csv")
 
 ##Make sure the columns to merge on are of the same datatype
 adnimerge$RID <- as.numeric(adnimerge$RID)
@@ -95,6 +96,8 @@ adnimerge$VISCODE <- as.character(adnimerge$VISCODE)
 npi$VISCODE <- as.character(npi$VISCODE)
 medhist$VISCODE <- as.character(medhist$VISCODE)
 gdscale$VISCODE <- as.character(gdscale$VISCODE)
+pet$RID <- as.numeric(pet$RID)
+pet$VISCODE <- as.character(pet$VISCODE)
 
 ## do the Pacc calculations
 dd <- adnimerge %>%
@@ -107,6 +110,9 @@ colnames(adni_pacc)
 
 
 ##Subset the columns of interest from each dataset so that it's easier to merge for me
+sub_pet <- pet %>%
+  select(RID, VISCODE, PTID, PHC_CENTILOIDS, PHC_AMYLOID_STATUS, PHC_CL_FAIL)
+
 sub_adni_pacc <- adni_pacc %>%
   select(RID, VISCODE, ADASQ4, LDELTOTAL, DIGITSCOR, MMSE, TRABSCOR, mPACCdigit, mPACCtrailsB)
 
@@ -155,7 +161,8 @@ master_df <- sub_adnimerge %>%
   left_join(sub_cvrf, by = c("RID", "VISCODE")) %>%
   left_join(adni1lipidomicsrader, by = c("RID", "VISCODE")) %>%
   left_join(sub_admcgctof, by = c("RID")) %>%
-  left_join(adni_pacc, by = c("RID", "VISCODE"))
+  left_join(adni_pacc, by = c("RID", "VISCODE")) %>%
+  left_join(sub_pet, by = c("RID", "VISCODE"))
 
 dim(master_df) ## 16633 rows
 colnames(master_df)
@@ -218,41 +225,41 @@ colnames(master_df)
 
 # library(dplyr)
 
-risk_factor_df <- master_df %>%
+all_risk_factor_df <- master_df %>%
   mutate(
     Chol_G4 = case_when(
-      DX.bl.x %in% c("CN", "MCI", "Dementia", "LMCI", "EMCI", "SMC" ) & Chol_group == "High" ~ "A4.High",
-      DX.bl.x %in% c("CN", "MCI", "Dementia", "LMCI", "EMCI", "SMC" ) & Chol_group == "Normal" ~ "A4.Normal",
-      DX.bl.x == "NA" & Chol_group == "High" ~ "Learn.High",
-      DX.bl.x == "NA" & Chol_group == "Normal" ~ "Learn.Normal",
+      PHC_AMYLOID_STATUS == 1 & Chol_group == "High" ~ "A4.High",
+      PHC_AMYLOID_STATUS == 1 & Chol_group == "Normal" ~ "A4.Normal",
+      PHC_AMYLOID_STATUS == 0 & Chol_group == "High" ~ "Learn.High",
+      PHC_AMYLOID_STATUS == 0 & Chol_group == "Normal" ~ "Learn.Normal",
       TRUE ~ NA_character_
     ),
     Diabetes_G4 = case_when(
-      DX.bl.x %in% c("CN", "MCI", "Dementia", "LMCI", "EMCI", "SMC" ) & Diabetes_group == "Yes" ~ "A4.High",
-      DX.bl.x %in% c("CN", "MCI", "Dementia", "LMCI", "EMCI", "SMC" ) & Diabetes_group == "No" ~ "A4.Normal",
-      DX.bl.x == "NA" & Diabetes_group == "Yes" ~ "Learn.High",
-      DX.bl.x == "NA" & Diabetes_group == "No" ~ "Learn.Normal",
+      PHC_AMYLOID_STATUS == 1 & Diabetes_group == "Yes" ~ "A4.High",
+      PHC_AMYLOID_STATUS == 1 & Diabetes_group == "No" ~ "A4.Normal",
+      PHC_AMYLOID_STATUS == 0 & Diabetes_group == "Yes" ~ "Learn.High",
+      PHC_AMYLOID_STATUS == 0 & Diabetes_group == "No" ~ "Learn.Normal",
       TRUE ~ NA_character_
     ),
     BMI_G4 = case_when(
-      DX.bl.x %in% c("CN", "MCI", "Dementia", "LMCI", "EMCI", "SMC" ) & BMI_group == "Obese" ~ "A4.High",
-      DX.bl.x %in% c("CN", "MCI", "Dementia", "LMCI", "EMCI", "SMC" ) & BMI_group == "No Obesity" ~ "A4.Normal",
-      DX.bl.x == "NA" & BMI_group == "Obese" ~ "Learn.High",
-      DX.bl.x == "NA" & BMI_group == "No Obesity" ~ "Learn.Normal",
+      PHC_AMYLOID_STATUS == 1 & BMI_group == "Obese" ~ "A4.High",
+      PHC_AMYLOID_STATUS == 1 & BMI_group == "No Obesity" ~ "A4.Normal",
+      PHC_AMYLOID_STATUS == 0 & BMI_group == "Obese" ~ "Learn.High",
+      PHC_AMYLOID_STATUS == 0 & BMI_group == "No Obesity" ~ "Learn.Normal",
       TRUE ~ NA_character_
     ),
     SBP_G4 = case_when(
-      DX.bl.x %in% c("CN", "MCI", "Dementia", "LMCI", "EMCI", "SMC" ) & SBP_group == "High" ~ "A4.High",
-      DX.bl.x %in% c("CN", "MCI", "Dementia", "LMCI", "EMCI", "SMC" ) & SBP_group == "Normal" ~ "A4.Normal",
-      DX.bl.x == "NA" & SBP_group == "High" ~ "Learn.High",
-      DX.bl.x == "NA" & SBP_group == "Normal" ~ "Learn.Normal",
+      PHC_AMYLOID_STATUS == 1 & SBP_group == "High" ~ "A4.High",
+      PHC_AMYLOID_STATUS == 1 & SBP_group == "Normal" ~ "A4.Normal",
+      PHC_AMYLOID_STATUS == 0 & SBP_group == "High" ~ "Learn.High",
+      PHC_AMYLOID_STATUS == 0 & SBP_group == "Normal" ~ "Learn.Normal",
       TRUE ~ NA_character_
     ),
     PTEDUCAT_G4 = case_when(
-      DX.bl.x %in% c("CN", "MCI", "Dementia", "LMCI", "EMCI", "SMC" ) & PTEDUCAT_group == "High" ~ "A4.High",
-      DX.bl.x %in% c("CN", "MCI", "Dementia", "LMCI", "EMCI", "SMC" ) & PTEDUCAT_group == "Low" ~ "A4.Normal",
-      DX.bl.x == "NA" & PTEDUCAT_group == "High" ~ "Learn.High",
-      DX.bl.x == "NA" & PTEDUCAT_group == "Low" ~ "Learn.Normal",
+      PHC_AMYLOID_STATUS == 1 & PTEDUCAT_group == "High" ~ "A4.High",
+      PHC_AMYLOID_STATUS == 1 & PTEDUCAT_group == "Low" ~ "A4.Normal",
+      PHC_AMYLOID_STATUS == 0 & PTEDUCAT_group == "High" ~ "Learn.High",
+      PHC_AMYLOID_STATUS == 0 & PTEDUCAT_group == "Low" ~ "Learn.Normal",
       TRUE ~ NA_character_
     )
   )
@@ -263,7 +270,21 @@ risk_factor_df <- master_df %>%
 ## Basic descrptive analysis of dataset and check for missingsness
 
 
-head(risk_factor_df, 5)
-colnames(risk_factor_df)
-dim(risk_factor_df) ## 16633 rows
-write.csv(risk_factor_df, "data/risk_factor_df_raw.csv", row.names = FALSE)
+head(all_risk_factor_df, 5)
+colnames(all_risk_factor_df)
+length(unique(all_risk_factor_df$RID)) ## 2436 unique patients
+dim(all_risk_factor_df) ## 16633 rows
+write.csv(all_risk_factor_df, "data/all_risk_factor_df_raw.csv", row.names = FALSE)
+
+
+
+## Subset the data to only include patients with PET imaging data and are cognitively normal (CN) at baseline
+cn_risk_factor_df <- all_risk_factor_df %>%
+  filter(DX.bl.x == "CN")
+
+dim(cn_risk_factor_df) ## 4975 rows
+length(unique(cn_risk_factor_df$RID)) ## 543 unique patients
+write.csv(cn_risk_factor_df, "data/cn_risk_factor_df_raw.csv", row.names = FALSE)
+
+
+### Basic descriptive analysis of dataset and check for missingsness
