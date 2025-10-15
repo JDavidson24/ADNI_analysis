@@ -1,7 +1,7 @@
 ##Pakcages and information needed for the analysis
 install.packages("Hmisc")
 library(Hmisc)
-install.packages("ADNIMERGE", repos = NULL, type = "source")
+install.packages("data/ADNIMERGE", repos = NULL, type = "source")
 # help(package = "ADNIMERGE")
 install.packages("yardstick")
 # pacc(dbl, keepComponents = FALSE)
@@ -198,6 +198,7 @@ master_df$BMI_group <- ifelse(master_df$PHC_BMI >= 30, "Obese", "No Obesity")
 master_df$SBP_group <- ifelse(master_df$PHC_SBP > 140, "High", "Normal")
 master_df$PTEDUCAT_group <- ifelse(master_df$PTEDUCAT > 12, "High", "Low")
 
+
 head(master_df, 5)
 dim(master_df)
 
@@ -255,6 +256,12 @@ risk_factor_df <- master_df %>%
       TRUE ~ NA_character_
     )
   )
+
+## We have the AB+ from the PET imaging
+## We want patients who have PET imaging data and are congnitively impaired (CN or CU diagnosisis at baseline)
+## 1 dataset only with CN and another dataset with all baseline diagnosis
+## Basic descrptive analysis of dataset and check for missingsness
+
 
 head(risk_factor_df, 5)
 colnames(risk_factor_df)
