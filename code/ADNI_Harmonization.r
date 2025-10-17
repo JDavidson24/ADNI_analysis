@@ -288,3 +288,22 @@ write.csv(cn_risk_factor_df, "data/cn_risk_factor_df_raw.csv", row.names = FALSE
 
 
 ### Basic descriptive analysis of dataset and check for missingsness
+# install.packages(c("readr", "skimr", "writexl"))
+
+library(readr)
+library(skimr)
+library(writexl)
+
+# Generate descriptive statistics for all_risk_factor_df
+summary_stats <- skim(all_risk_factor_df)
+summary_export <- as.data.frame(summary_stats)
+
+# Export to Excel for all_risk_factor_df
+write_xlsx(summary_export, "data/descriptive_stats/all_Descriptive_Statistics.xlsx")
+
+# Generate descriptive statistics for cn_risk_factor_df
+summary_stats <- skim(cn_risk_factor_df)
+summary_export <- as.data.frame(summary_stats)
+
+# Export to Excel for cn_risk_factor_df
+write_xlsx(summary_export, "data/descriptive_stats/cn_Descriptive_Statistics.xlsx")
