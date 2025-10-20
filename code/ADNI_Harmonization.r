@@ -122,7 +122,7 @@ sub_adni_pacc <- adni_pacc %>%
 
 sub_adnimerge <- adnimerge %>%
   select(RID, PTID, VISCODE, DX, DX.bl,
-  PTMARRY, PTETHCAT, PTEDUCAT, PTGENDER, APOE4)
+  PTMARRY, PTETHCAT, PTEDUCAT, PTGENDER, AGE, APOE4, Years.bl, Month.bl)
 
 ##Baseline data from CVRF for diabetes 
 sub_cvrf <- cvrf %>%
@@ -214,6 +214,15 @@ mutate(AAPOEGNPRSNFLG_all = case_when(
     APOE4 == 2 ~ "E4+",
     TRUE ~ "NA"
   ))
+
+## change names of columns for varaibles to use to replicate the code seamlessly
+master_df$year <- as.numeric(master_df$Years.bl)
+master_df$PTGENDER_all <- master_df$PTGENDER  
+master_df$PTMARRY_all <- master_df$PTMARRY
+master_df$PTETHNIC_all <- master_df$PTETHCAT
+master_df$PTAGE_all <- master_df$AGE
+master_df$PACC.raw <- master_df$mPACCdigit
+
 
 
 head(master_df, 5)
@@ -317,3 +326,5 @@ summary_export <- as.data.frame(summary_stats)
 
 # Export to Excel for cn_risk_factor_df
 write_xlsx(summary_export, "data/descriptive_stats/cn_Descriptive_Statistics.xlsx")
+
+
