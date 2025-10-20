@@ -12,6 +12,8 @@ library(tidyr)
 
 # data(adnimerge)
 # data(adas)
+# data(apoego2)
+
 
 # dim(adnimerge)
 # head(adnimerge, 10)
@@ -66,6 +68,7 @@ write.csv(medhist, "data/MEDHIST.csv", row.names = FALSE)
 write.csv(admcgctof, "data/ADMCGCTOF.csv", row.names = FALSE)
 write.csv(zhang, "data/ZHANG.csv", row.names = FALSE)
 write.csv(adni1lipidomicsrader, "data/adni1lipidomicsrader.csv", row.names = FALSE)
+write.csv(apoego2, "data/APOEGON.csv", row.names = FALSE)
 
 ## Load the datasets as csv files
 adnimerge <- read.csv("data/ADNIMERGE.csv")
@@ -77,6 +80,7 @@ zhang <- read.csv("data/ZHANG.csv")
 cvrf <- read.csv("data/Assessment_Analyses/ADSP_PHC_CVRF_18Sep2025.csv")
 adni1lipidomicsrader <- read.csv("data/adni1lipidomicsrader.csv")
 pet <- read.csv("data/Image_Analyses/ADSP_PHC_PET_Amyloid_Simple_18Sep2025.csv")
+apo <- read.csv("data/APOEGON.csv")
 
 ##Make sure the columns to merge on are of the same datatype
 adnimerge$RID <- as.numeric(adnimerge$RID)
@@ -204,6 +208,12 @@ master_df$Diabetes_group <- ifelse(master_df$PHC_Diabetes == 1, "Yes", "No")
 master_df$BMI_group <- ifelse(master_df$PHC_BMI >= 30, "Obese", "No Obesity")
 master_df$SBP_group <- ifelse(master_df$PHC_SBP > 140, "High", "Normal")
 master_df$PTEDUCAT_group <- ifelse(master_df$PTEDUCAT > 12, "High", "Low")
+master_df <- master_df %>%
+mutate(AAPOEGNPRSNFLG_all = case_when(
+    APOE4 == 1 ~ "E4-",
+    APOE4 == 2 ~ "E4+",
+    TRUE ~ "NA"
+  ))
 
 
 head(master_df, 5)
