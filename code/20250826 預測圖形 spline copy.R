@@ -5,6 +5,8 @@ library(ggplot2)
 library(dplyr)
 library(splines)
 library(grid)
+
+PACC_all <- read.csv("data/all_risk_factor_df_raw.csv")
 ## 1) 樣條 LMM：時間改用 natural cubic spline（兩個基底項）
 #   固定效應：ns(year, df=3) * PTEDUCAT_G4（可改 df=2~4 調整彎曲度）
 PACC_PTEDUCAT_spline <- lmer(

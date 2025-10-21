@@ -222,6 +222,8 @@ master_df$PTMARRY_all <- master_df$PTMARRY
 master_df$PTETHNIC_all <- master_df$PTETHCAT
 master_df$PTAGE_all <- master_df$AGE
 master_df$PACC.raw <- master_df$mPACCdigit
+master_df$BID <- master_df$PTID.x
+
 
 
 
@@ -326,5 +328,3 @@ summary_export <- as.data.frame(summary_stats)
 
 # Export to Excel for cn_risk_factor_df
 write_xlsx(summary_export, "data/descriptive_stats/cn_Descriptive_Statistics.xlsx")
-
-
