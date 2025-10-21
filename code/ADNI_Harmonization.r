@@ -285,6 +285,9 @@ all_risk_factor_df <- master_df %>%
     )
   )
 
+all_risk_factor_df$chol200_G4 <- all_risk_factor_df$Chol_G4
+all_risk_factor_df$HbA1c_G4 <- all_risk_factor_df$Diabetes_G4
+
 ## We have the AB+ from the PET imaging
 ## We want patients who have PET imaging data and are congnitively impaired (CN or CU diagnosisis at baseline)
 ## 1 dataset only with CN and another dataset with all baseline diagnosis
