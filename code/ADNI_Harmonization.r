@@ -13,6 +13,8 @@ library(tidyr)
 # data(adnimerge)
 # data(adas)
 # data(apoego2)
+data(vitals)
+
 
 
 # dim(adnimerge)
@@ -81,6 +83,10 @@ cvrf <- read.csv("data/Assessment_Analyses/ADSP_PHC_CVRF_18Sep2025.csv")
 adni1lipidomicsrader <- read.csv("data/adni1lipidomicsrader.csv")
 pet <- read.csv("data/Image_Analyses/ADSP_PHC_PET_Amyloid_Simple_18Sep2025.csv")
 apo <- read.csv("data/APOEGON.csv")
+vitals <- read.csv("data/Vitals/VITALS_21Oct2025.csv")
+medications <- read.csv("data/Medication/RECCMEDS_21Oct2025.csv")
+medical_hist <- read.csv("data/Medical_History/INITHEALTH_21Oct2025.csv")
+
 
 ##Make sure the columns to merge on are of the same datatype
 adnimerge$RID <- as.numeric(adnimerge$RID)
@@ -102,6 +108,12 @@ medhist$VISCODE <- as.character(medhist$VISCODE)
 gdscale$VISCODE <- as.character(gdscale$VISCODE)
 pet$RID <- as.numeric(pet$RID)
 pet$VISCODE <- as.character(pet$VISCODE)
+vitals$RID <- as.numeric(vitals$RID)
+vitals$VISCODE <- as.character(vitals$VISCODE)
+medical_hist$RID <- as.numeric(medical_hist$RID)
+medical_hist$VISCODE <- as.character(medical_hist$VISCODE)  
+medications$RID <- as.numeric(medications$RID)
+medications$VISCODE <- as.character(medications$VISCODE)
 
 ## do the Pacc calculations
 dd <- adnimerge %>%
@@ -112,10 +124,25 @@ dim(adni_pacc)
 head(adni_pacc, 5)
 colnames(adni_pacc)
 
+##Subset the medications dataset to only include cholesterol and diabetes diagnosis
+library(stringr)
+medical_hist <- filter(medical_hist, str_detect(tolower(IHDESC), "cholesterol|diabetes"))
+head(medical_hist, 50)
+
+# medications <- filter(medications, str_detect(tolower(CMMED), "cholesterol|diabetes"))
 
 ##Subset the columns of interest from each dataset so that it's easier to merge for me
 sub_pet <- pet %>%
   select(RID, VISCODE, PTID, PHC_CENTILOIDS, PHC_AMYLOID_STATUS, PHC_CL_FAIL)
+
+sub_vitals <- vitals %>%
+  select(RID, VISCODE, PTID, VSBPSYS, )
+
+sub_medical_hist <- medical_hist %>%
+  select(RID, VISCODE, PTID, IHDESC)
+
+sub_medications <- medications %>%
+  select(RID, VISCODE, PTID, CMMED)
 
 sub_adni_pacc <- adni_pacc %>%
   select(RID, VISCODE, ADASQ4, LDELTOTAL, DIGITSCOR, MMSE, TRABSCOR, mPACCdigit, mPACCtrailsB)
@@ -161,14 +188,17 @@ master_df <- sub_adnimerge %>%
   # left_join(sub_gdscale, by = c("RID")) %>%
   # left_join(sub_npi, by = c("RID")) %>%
   # left_join(sub_medhist, by = c("RID")) %>%
-  left_join(sub_zhang, by = c("RID", "VISCODE")) %>%
-  left_join(sub_cvrf, by = c("RID", "VISCODE")) %>%
+  # left_join(sub_zhang, by = c("RID", "VISCODE")) %>%
+  # left_join(sub_cvrf, by = c("RID", "VISCODE")) %>%
   left_join(adni1lipidomicsrader, by = c("RID", "VISCODE")) %>%
-  left_join(sub_admcgctof, by = c("RID")) %>%
+  # left_join(sub_admcgctof, by = c("RID")) %>%
   left_join(adni_pacc, by = c("RID", "VISCODE")) %>%
-  left_join(sub_pet, by = c("RID", "VISCODE"))
+  left_join(sub_pet, by = c("RID", "VISCODE")) %>%
+  left_join(sub_vitals, by = c("RID", "VISCODE")) %>%
+  left_join(sub_medical_hist, by = c("RID", "VISCODE")) %>%
+  left_join(sub_medications, by = c("RID", "VISCODE"))
 
-dim(master_df) ## 16633 rows
+dim(master_df) ## 19845 rows
 colnames(master_df)
 
 write.csv(master_df, "data/master_df_raw.csv", row.names = FALSE)
@@ -192,6 +222,8 @@ length(unique(master_df$RID)) ## 2436 patients
 ## we want to group them into G1-G4 based on the risk factors
 ## some datasets dont have bl for baseline and may have screening visits
 ## check the missingss in each dataset
+## use the vitals dataset to sys data where VSBPSYS column
+## use the medhistory dataset to check for diabetes and high cholesterol using like terms in IHDESC
 
 ## High chol is measured as > 200 mg/dL everything else is considered normal
 ## Diabetes is measured as 1 for yes and 0 for no if a patient has diabetes then it will count as a risk factor
@@ -203,17 +235,34 @@ length(unique(master_df$RID)) ## 2436 patients
 ### Develop a function to classify the risk factors based on measurements for chol, BMI, diabetes, and SBP
 ## turn risk factotrs into high or normal for patients
 
-master_df$Chol_group <- ifelse(master_df$CHOL > 200, "High", "Normal")
-master_df$Diabetes_group <- ifelse(master_df$PHC_Diabetes == 1, "Yes", "No")
+# master_df$Chol_group <- ifelse(master_df$CHOL > 200, "High", "Normal")
 master_df$BMI_group <- ifelse(master_df$PHC_BMI >= 30, "Obese", "No Obesity")
-master_df$SBP_group <- ifelse(master_df$PHC_SBP > 140, "High", "Normal")
+master_df$SBP_group <- ifelse(master_df$VSBPSYS > 140, "High", "Normal")
 master_df$PTEDUCAT_group <- ifelse(master_df$PTEDUCAT > 12, "High", "Low")
+
 master_df <- master_df %>%
 mutate(AAPOEGNPRSNFLG_all = case_when(
     APOE4 == 1 ~ "E4-",
     APOE4 == 2 ~ "E4+",
     TRUE ~ "NA"
   ))
+
+master_df <- master_df %>%
+  mutate(
+    Diabetes_group = case_when(
+      str_detect(tolower(IHDESC), "diabetes|mellitus") ~ "Yes",
+      TRUE ~ "No"
+    )
+  )
+
+master_df <- master_df %>%
+  mutate(
+    Chol_group = case_when(
+      str_detect(tolower(IHDESC), "cholesterol|hyperlipidemia") ~ "High",
+      TRUE ~ "Normal"
+    )
+  )
+
 
 ## change names of columns for varaibles to use to replicate the code seamlessly
 master_df$year <- as.numeric(master_df$Years.bl)
@@ -240,6 +289,12 @@ dim(master_df)
 master_df <- read.csv("data/master_df_raw.csv")
 head(master_df, 5)
 
+master_df %>%
+  arrange(desc(PTID.x)) %>%  # sort descending by emmean
+  head(10) 
+
+
+
 unique(master_df$DX.bl.x)
 unique(master_df$Diabetes_group)
 colnames(master_df)
@@ -262,13 +317,13 @@ all_risk_factor_df <- master_df %>%
       PHC_AMYLOID_STATUS == 0 & Diabetes_group == "No" ~ "Learn.Normal",
       TRUE ~ NA_character_
     ),
-    BMI_G4 = case_when(
-      PHC_AMYLOID_STATUS == 1 & BMI_group == "Obese" ~ "A4.High",
-      PHC_AMYLOID_STATUS == 1 & BMI_group == "No Obesity" ~ "A4.Normal",
-      PHC_AMYLOID_STATUS == 0 & BMI_group == "Obese" ~ "Learn.High",
-      PHC_AMYLOID_STATUS == 0 & BMI_group == "No Obesity" ~ "Learn.Normal",
-      TRUE ~ NA_character_
-    ),
+    # BMI_G4 = case_when(
+    #   PHC_AMYLOID_STATUS == 1 & BMI_group == "Obese" ~ "A4.High",
+    #   PHC_AMYLOID_STATUS == 1 & BMI_group == "No Obesity" ~ "A4.Normal",
+    #   PHC_AMYLOID_STATUS == 0 & BMI_group == "Obese" ~ "Learn.High",
+    #   PHC_AMYLOID_STATUS == 0 & BMI_group == "No Obesity" ~ "Learn.Normal",
+    #   TRUE ~ NA_character_
+    # ),
     SBP_G4 = case_when(
       PHC_AMYLOID_STATUS == 1 & SBP_group == "High" ~ "A4.High",
       PHC_AMYLOID_STATUS == 1 & SBP_group == "Normal" ~ "A4.Normal",
@@ -297,7 +352,7 @@ all_risk_factor_df$HbA1c_G4 <- all_risk_factor_df$Diabetes_G4
 head(all_risk_factor_df, 5)
 colnames(all_risk_factor_df)
 length(unique(all_risk_factor_df$RID)) ## 2436 unique patients
-dim(all_risk_factor_df) ## 16633 rows
+dim(all_risk_factor_df) ## 19845 rows
 write.csv(all_risk_factor_df, "data/all_risk_factor_df_raw.csv", row.names = FALSE)
 
 
@@ -331,3 +386,5 @@ summary_export <- as.data.frame(summary_stats)
 
 # Export to Excel for cn_risk_factor_df
 write_xlsx(summary_export, "data/descriptive_stats/cn_Descriptive_Statistics.xlsx")
+
+unique(all_risk_factor_df$HbA1c_G4)

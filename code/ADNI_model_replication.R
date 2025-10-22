@@ -115,104 +115,104 @@ ggplot(pred_df, aes(x = year, y = emmean,
 
 
 
-#Alcohol
-# --- 1) Alcohol Spline LMM ---
-PACC_Alcohol_spline <- lmer(
-  PACC.raw ~ ns(year, df = 3) * Alcohol_G4 +      # 🔑 使用 spline
-    PTAGE_all + PTGENDER_all + PTMARRY_all +
-    AAPOEGNPRSNFLG_all + PTETHNIC_all +
-    (1 + year | BID),
-  data = PACC_all
-)
+# #Alcohol
+# # --- 1) Alcohol Spline LMM ---
+# PACC_Alcohol_spline <- lmer(
+#   PACC.raw ~ ns(year, df = 3) * Alcohol_G4 +      # 🔑 使用 spline
+#     PTAGE_all + PTGENDER_all + PTMARRY_all +
+#     AAPOEGNPRSNFLG_all + PTETHNIC_all +
+#     (1 + year | BID),
+#   data = PACC_all
+# )
 
-# --- 2) Prediction (reference grid) ---
-yr <- seq(min(PACC_all$year, na.rm=TRUE),
-          max(PACC_all$year, na.rm=TRUE),
-          length.out=50)   # 可以調整點數 (30~100)，越多曲線越平滑
+# # --- 2) Prediction (reference grid) ---
+# yr <- seq(min(PACC_all$year, na.rm=TRUE),
+#           max(PACC_all$year, na.rm=TRUE),
+#           length.out=50)   # 可以調整點數 (30~100)，越多曲線越平滑
 
-rg <- ref_grid(PACC_Alcohol_spline,
-               at=list(year=yr),
-               cov.reduce=mean,
-               weights="proportional",
-               nuisance=c("PTGENDER_all","PTMARRY_all","AAPOEGNPRSNFLG_all","PTETHNIC_all"))
+# rg <- ref_grid(PACC_Alcohol_spline,
+#                at=list(year=yr),
+#                cov.reduce=mean,
+#                weights="proportional",
+#                nuisance=c("PTGENDER_all","PTMARRY_all","AAPOEGNPRSNFLG_all","PTETHNIC_all"))
 
-emm <- emmeans(rg, ~ year | Alcohol_G4, type="response")
+# emm <- emmeans(rg, ~ year | Alcohol_G4, type="response")
 
-# --- 3) 建立預測資料集 (含信賴區間與分組) ---
-pred_df <- as.data.frame(confint(emm, level=0.95)) %>%
-  rename(
-    lcl = any_of(c("lower.CL","asymp.LCL")),
-    ucl = any_of(c("upper.CL","asymp.UCL"))
-  ) %>%
-  mutate(
-    Group_Level = factor(Alcohol_G4,
-                         levels = c("A4.Alcohol","A4.No Alcohol",
-                                    "LEARN.Alcohol","LEARN.No Alcohol"))
-  )
+# # --- 3) 建立預測資料集 (含信賴區間與分組) ---
+# pred_df <- as.data.frame(confint(emm, level=0.95)) %>%
+#   rename(
+#     lcl = any_of(c("lower.CL","asymp.LCL")),
+#     ucl = any_of(c("upper.CL","asymp.UCL"))
+#   ) %>%
+#   mutate(
+#     Group_Level = factor(Alcohol_G4,
+#                          levels = c("A4.Alcohol","A4.No Alcohol",
+#                                     "LEARN.Alcohol","LEARN.No Alcohol"))
+#   )
 
-# --- 4) 自訂顏色與線型 ---
-custom_colors <- c(
-  "A4.No Alcohol"     = "#d73027",  # 深紅
-  "A4.Alcohol"  = "#fcae91",  # 淺紅
-  "LEARN.No Alcohol"  = "#4575b4",  # 深藍
-  "LEARN.Alcohol" = "#91bfdb" # 淺藍
-)
+# # --- 4) 自訂顏色與線型 ---
+# custom_colors <- c(
+#   "A4.No Alcohol"     = "#d73027",  # 深紅
+#   "A4.Alcohol"  = "#fcae91",  # 淺紅
+#   "LEARN.No Alcohol"  = "#4575b4",  # 深藍
+#   "LEARN.Alcohol" = "#91bfdb" # 淺藍
+# )
 
-custom_linetypes <- c(
-  "A4.No Alcohol"     = "solid",
-  "A4.Alcohol"  = "dashed",
-  "LEARN.No Alcohol"  = "solid",
-  "LEARN.Alcohol" = "dashed"
-)
+# custom_linetypes <- c(
+#   "A4.No Alcohol"     = "solid",
+#   "A4.Alcohol"  = "dashed",
+#   "LEARN.No Alcohol"  = "solid",
+#   "LEARN.Alcohol" = "dashed"
+# )
 
-# --- 5) 軸線範圍 (人工軸線用) ---
-x_max <- max(pred_df$year, na.rm = TRUE)
-y_top <- ceiling(max(pred_df$ucl,  na.rm = TRUE))
+# # --- 5) 軸線範圍 (人工軸線用) ---
+# x_max <- max(pred_df$year, na.rm = TRUE)
+# y_top <- ceiling(max(pred_df$ucl,  na.rm = TRUE))
 
-# --- 6) 繪圖 ---
-ggplot(pred_df, aes(x = year, y = emmean,
-                    color = Group_Level, linetype = Group_Level)) +
-  geom_ribbon(aes(ymin = lcl, ymax = ucl, fill = Group_Level),
-              alpha = 0.18, color = NA, show.legend = FALSE) +
-  geom_line(linewidth = 1.2) +
-  labs(
-    title = "2B. Modeled PACC by Aβ status and Alcohol group",
-    x = "Year", y = "Modeled mean PACC"
-  ) +
-  theme_classic() +
-  theme(
-    axis.line  = element_blank(),
-    axis.ticks = element_blank(),
-    panel.grid = element_blank(),
-    panel.border = element_blank(),
-    legend.background = element_blank(),
-    legend.key = element_blank(),
-    legend.title = element_blank(),
-    legend.key.width  = grid::unit(1.5, "cm"),
-    legend.key.height = grid::unit(0.5, "cm"),
-    legend.text = element_text(size = 10)
-  ) +
-  scale_color_manual(values = custom_colors) +
-  scale_fill_manual(values  = custom_colors) +
-  scale_linetype_manual(values = custom_linetypes) +
-  guides(
-    fill = "none",
-    color = guide_legend(
-      override.aes = list(
-        linewidth = 1.0,
-        linetype  = custom_linetypes,
-        color     = custom_colors
-      )
-    )
-  ) +
-  # 人工畫軸線 (交會點 0, -10)
-  geom_segment(x = 0, xend = x_max,
-               y = -8, yend = -8, color = "black") +   # X 軸
-  geom_segment(x = 0, xend = 0,
-               y = -8, yend = y_top, color = "black") + # Y 軸
-  scale_x_continuous(limits = c(0, NA)) +
-  scale_y_continuous(limits = c(-8, NA)) +
-  coord_cartesian(clip = "off")
+# # --- 6) 繪圖 ---
+# ggplot(pred_df, aes(x = year, y = emmean,
+#                     color = Group_Level, linetype = Group_Level)) +
+#   geom_ribbon(aes(ymin = lcl, ymax = ucl, fill = Group_Level),
+#               alpha = 0.18, color = NA, show.legend = FALSE) +
+#   geom_line(linewidth = 1.2) +
+#   labs(
+#     title = "2B. Modeled PACC by Aβ status and Alcohol group",
+#     x = "Year", y = "Modeled mean PACC"
+#   ) +
+#   theme_classic() +
+#   theme(
+#     axis.line  = element_blank(),
+#     axis.ticks = element_blank(),
+#     panel.grid = element_blank(),
+#     panel.border = element_blank(),
+#     legend.background = element_blank(),
+#     legend.key = element_blank(),
+#     legend.title = element_blank(),
+#     legend.key.width  = grid::unit(1.5, "cm"),
+#     legend.key.height = grid::unit(0.5, "cm"),
+#     legend.text = element_text(size = 10)
+#   ) +
+#   scale_color_manual(values = custom_colors) +
+#   scale_fill_manual(values  = custom_colors) +
+#   scale_linetype_manual(values = custom_linetypes) +
+#   guides(
+#     fill = "none",
+#     color = guide_legend(
+#       override.aes = list(
+#         linewidth = 1.0,
+#         linetype  = custom_linetypes,
+#         color     = custom_colors
+#       )
+#     )
+#   ) +
+#   # 人工畫軸線 (交會點 0, -10)
+#   geom_segment(x = 0, xend = x_max,
+#                y = -8, yend = -8, color = "black") +   # X 軸
+#   geom_segment(x = 0, xend = 0,
+#                y = -8, yend = y_top, color = "black") + # Y 軸
+#   scale_x_continuous(limits = c(0, NA)) +
+#   scale_y_continuous(limits = c(-8, NA)) +
+#   coord_cartesian(clip = "off")
 
 
 # HbA1c 分組變數 ---
@@ -226,16 +226,18 @@ PACC_all <- PACC_all %>%
 
 # --- 1) HbA1c Spline LMM ---
 ## There’s no repeated data structure, we have to use a plain linear model (lm)
-# PACC_HbA1c_spline <- lmer(
-#   PACC.raw ~ ns(year, df = 3) * HbA1c_G4 +
-#     PTAGE_all + PTGENDER_all + PTMARRY_all +
-#     AAPOEGNPRSNFLG_all + PTETHNIC_all +
-#     (1 | BID),
-#   data = PACC_all
-# )
+PACC_HbA1c_spline <- lmer(
+  PACC.raw ~ ns(year, df = 3) * HbA1c_G4 +
+    PTAGE_all + PTGENDER_all + PTMARRY_all +
+    AAPOEGNPRSNFLG_all + PTETHNIC_all +
+    (1 | BID),
+  data = PACC_all
+)
+
+summary(PACC_HbA1c_spline)
 
 ## we have the levels of variables used in modeling the data
-#model_data <- na.omit(PACC_all[, c("PACC.raw", "year", "HbA1c_G4", 
+# model_data <- na.omit(PACC_all[, c("PACC.raw", "year", "HbA1c_G4", 
 #                                    "PTAGE_all", "PTGENDER_all", "PTMARRY_all",
 #                                    "AAPOEGNPRSNFLG_all", "PTETHNIC_all")])
 
@@ -248,9 +250,12 @@ PACC_HbA1c_spline <- lm(
   PACC.raw ~ ns(year, df = 3) * HbA1c_G4 +
     PTAGE_all + PTGENDER_all + PTMARRY_all +
     AAPOEGNPRSNFLG_all,   # remove any variable with only 1 level
-  data = model_data
+  data = PACC_all
 )
 
+summary(PACC_HbA1c_spline)
+
+## find the missing data in each analysis 
 
 # --- 2) Prediction (reference grid) ---
 common_max <- PACC_all %>%
