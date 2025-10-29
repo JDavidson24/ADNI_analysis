@@ -126,7 +126,7 @@ colnames(adni_pacc)
 
 ##Subset the medications dataset to only include cholesterol and diabetes diagnosis
 library(stringr)
-medical_hist <- filter(medical_hist, str_detect(tolower(IHDESC), "cholesterol|diabetes"))
+# medical_hist <- filter(medical_hist, str_detect(tolower(IHDESC), "cholesterol|diabetes"))
 head(medical_hist, 50)
 
 # medications <- filter(medications, str_detect(tolower(CMMED), "cholesterol|diabetes"))
@@ -263,6 +263,30 @@ master_df <- master_df %>%
     )
   )
 
+# master_df <- master_df %>%
+#   mutate(
+#     Diabetes_group_2 = case_when(
+#       str_detect(tolower(CMMED), "Humulin" | "Novolin" | "Fiasp" | "NovoLog" | "Afrezza" | "Admelog" | "Humalog" | "Lyumjev" | "Tresiba" | "insulin" | "Basaglar KwikPen" | "Lantus" | "Toujeo SoloStar" | "Semglee-yfgn” | "Amylinomimetic" | "acarbose" | "miglitol" | "Glyset" | "Kazano" | "Invokamet" | "Xigduo XR" | "Synjardy" | "Segluromet" | "metformin/glipizide" | "Glucovance" | "Jentadueto" | "Actoplus Met" | "metformin” | "repaglinide" | "saxagliptin" | "Janumet" | "Cycloset" | "alogliptin" | "Nesina" | "Kazano" | "Tradjenta" | "Glyxambi" | "Onglyza" | "Januvia" | "sitagliptin" | "simvastatin" | "Trulicity" | "Byetta" | "Bydureon BCise" | "Saxenda" | "Victoza" | "lixisenatide" | "Ozempic" | "Mounjaro" | "Starlix" | "Prandin" | "Invokana" | "Invokamet XR" | "Farxiga" | "Qtern" | "Jardiance" | "Trijardy XR" | "Synjardy XR" | "Steglatro" | "Amaryl" | "Duetact" | "gliclazide" | "glipizide" | "Glipizide XL" | "Glucotrol XL" | "Glynase" | "Oseni" | "Actoplus Met XR" | "rosiglitazone" | "Lyumjev" | "Lyumjev KwikPen" | "Tresiba" | "Semglee-yfgn" | "Humulin" | "NovoLog" | "Glyset" | "Kazano" | "Invokamet" | "Xigduo XR" | "Synjardy" | "Segluromet" | "Glucovance" | "Jentadueto" | "Actoplus Met" | "Janumet" | "Cycloset" | "Nesina" | "Tradjenta" | "Glyxambi" | "Onglyza" | "Januvia" | "Trulicity" | "Byetta" | "Bydureon BCise" | "Saxenda" | "Victoza" | "Ozempic" | "Mounjaro" | "Starlix" | "Prandin" | "Invokana" | "Invokamet XR" | "Farxiga" | "Qtern" | "Jardiance" | "Trijardy XR" | "Synjardy XR" | "Steglatro" | "Amaryl" | "Duetact" | "Glipizide XL" | "Glucotrol XL" | "Glynase" | "Oseni") ~ "Yes",
+#       TRUE ~ "No"
+#     )
+#   )
+
+# master_df <- master_df %>%
+#   mutate(
+#     Chol_group_2 = case_when(
+#       str_detect(tolower(CMMED), "Lipitor" | "Lescol XL" | "Altoprev" | "Livalo" | "Pravachol" |
+# "Crestor" | "Zocor" | "Zetia" | "Praluent" | "Repatha" | "Nexletol" | "Nexlizet" |
+# "Prevalite" | "Welchol" | "Colestid" | "Vytorin" | "Caduet" |
+# "Antara" | "Lipofen" | "Lopid" | "Niacor" | "Niaspan" |
+# "Lovaza" | "Omacor" | "Vascepa" | "Atorvastatin" | "Fluvastatin" | "Lovastatin" | 
+# "Pitavastatin" | "Pravastatin" | "Rosuvastatin" | "Simvastatin" | "Ezetimibe" | 
+# "Alirocumab" | "Evolocumab" | "Bempedoic acid" | "Bempedoic acid-ezetimibe" | 
+# "Cholestyramine" | "Colesevelam" | "Colestipol" | "Ezetimibe-simvastatin" | 
+# "Amlodipine-atorvastatin" | "Fenofibrate" | "Gemfibrozil" | "Niacin")
+#        ~ "High",
+#       TRUE ~ "Normal"
+#     )
+#   )
 
 ## change names of columns for varaibles to use to replicate the code seamlessly
 master_df$year <- as.numeric(master_df$Years.bl)
@@ -272,6 +296,7 @@ master_df$PTETHNIC_all <- master_df$PTETHCAT
 master_df$PTAGE_all <- master_df$AGE
 master_df$PACC.raw <- master_df$mPACCdigit
 master_df$BID <- master_df$PTID.x
+master_df$PTEDUCAT_all <- master_df$PTEDUCAT
 
 
 
@@ -295,7 +320,7 @@ master_df %>%
 
 
 
-unique(master_df$DX.bl.x)
+unique(master_df$PHC_AMYLOID_STATUS)
 unique(master_df$Diabetes_group)
 colnames(master_df)
 
@@ -342,14 +367,97 @@ all_risk_factor_df <- master_df %>%
 
 all_risk_factor_df$chol200_G4 <- all_risk_factor_df$Chol_G4
 all_risk_factor_df$HbA1c_G4 <- all_risk_factor_df$Diabetes_G4
+all_risk_factor_df$PTEDUCAT_all <- all_risk_factor_df$PTEDUCAT
 
 ## We have the AB+ from the PET imaging
 ## We want patients who have PET imaging data and are congnitively impaired (CN or CU diagnosisis at baseline)
 ## 1 dataset only with CN and another dataset with all baseline diagnosis
 ## Basic descrptive analysis of dataset and check for missingsness
 
+all_risk_factor_df <- all_risk_factor_df %>%
+  mutate(
+    SUBSTUDY = case_when(
+      PHC_AMYLOID_STATUS == 1 ~ "A4",
+      PHC_AMYLOID_STATUS == 0 ~ "Learn",
+      TRUE ~ NA_character_
+    )
+  )
 
-head(all_risk_factor_df, 5)
+## we want the substudy column to be if it has one entry of amyloid status ==1 then it will be A4 else learn
+# all_risk_factor_df <- all_risk_factor_df %>%
+#   group_by(RID) %>%
+#   mutate(SUBSTUDY = first(SUBSTUDY)) %>%
+#   ungroup()
+
+all_risk_factor_df <- all_risk_factor_df %>%
+  group_by(RID) %>%
+  mutate(SUBSTUDY = case_when(
+    any(PHC_AMYLOID_STATUS == 1, na.rm = TRUE) ~ "A4",
+    all(is.na(PHC_AMYLOID_STATUS)) ~ NA_character_,
+    TRUE ~ "Learn"
+  )) %>%
+  ungroup()
+
+all_risk_factor_df$HbA1c6.5_group <- all_risk_factor_df$Diabetes_group
+all_risk_factor_df$HbA1c6.5_group_all <- all_risk_factor_df$Diabetes_group
+
+all_risk_factor_df$Chol200_group <- all_risk_factor_df$Chol_group
+all_risk_factor_df$Chol200_group_all <- all_risk_factor_df$Chol_group
+
+all_risk_factor_df$SBP_group_all <- all_risk_factor_df$SBP_group
+all_risk_factor_df$Chol200_group_all <- all_risk_factor_df$Chol200_group
+all_risk_factor_df$HbA1c6.5_group_all <- all_risk_factor_df$HbA1c6.5_group
+
+colnames(PACC_all)
+###create base columns that match the code by taking the coresponding entry for age, marry, gender columns, ethnic
+
+all_risk_factor_df <- all_risk_factor_df %>%
+  group_by(RID) %>%
+  mutate(PTAGE_base = ifelse(row_number() == 1, first(PTAGE_all), NA)) %>%
+  ungroup()
+
+all_risk_factor_df <- all_risk_factor_df %>%
+  group_by(RID) %>%
+  mutate(PTMARRY_base = ifelse(row_number() == 1, first(PTMARRY_all), NA)) %>%
+  ungroup()
+
+all_risk_factor_df <- all_risk_factor_df  %>%
+  group_by(RID) %>%
+  mutate(PTGENDER_base = ifelse(row_number() == 1, first(PTGENDER_all), NA)) %>%
+  ungroup()
+
+all_risk_factor_df <- all_risk_factor_df  %>%
+  group_by(RID) %>%
+  mutate(PTETHNIC_base = ifelse(row_number() == 1, first(PTETHNIC_all), NA)) %>%
+  ungroup()
+
+all_risk_factor_df <- all_risk_factor_df  %>%
+  group_by(RID) %>%
+  mutate(AAPOEGNPRSNFLG_base = ifelse(row_number() == 1, first(AAPOEGNPRSNFLG_all), NA)) %>%
+  ungroup()
+
+## create new group columns that match the code by taking the coresponding entry for all of the group columns
+all_risk_factor_df <- all_risk_factor_df  %>%
+  group_by(RID) %>%
+  mutate(HbA1c6.5_group = ifelse(row_number() == 1, first(HbA1c6.5_group_all), NA)) %>%
+  ungroup()
+
+all_risk_factor_df <- all_risk_factor_df  %>%
+  group_by(RID) %>%
+  mutate(Chol200_group = ifelse(row_number() == 1, first(Chol200_group_all), NA)) %>%
+  ungroup()
+
+all_risk_factor_df <- all_risk_factor_df  %>%
+  group_by(RID) %>%
+  mutate(SBP_group = ifelse(row_number() == 1, first(SBP_group_all), NA)) %>%
+  ungroup()
+
+all_risk_factor_df <- all_risk_factor_df %>%
+  group_by(RID) %>%
+  mutate(PTEDUCAT_group = ifelse(row_number() == 1, first(PTEDUCAT_all), NA)) %>%
+  ungroup()
+
+head(all_risk_factor_df$PTEDUCAT_group, 5)
 colnames(all_risk_factor_df)
 length(unique(all_risk_factor_df$RID)) ## 2436 unique patients
 dim(all_risk_factor_df) ## 19845 rows
