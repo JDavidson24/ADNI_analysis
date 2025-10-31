@@ -9,7 +9,7 @@ library(dplyr)
 library(yardstick)
 library(ADNIMERGE)
 library(tidyr)
-
+library(stringr)
 # data(adnimerge)
 # data(adas)
 # data(apoego2)
@@ -182,7 +182,29 @@ sub_admcgctof <- admcgctof %>%
 sub_adni1lipidomicsrader <- adni1lipidomicsrader %>%
   select(RID, VISCODE, CHOL, HDL)
 
+###Screen the VISCODE values to bl and sc to make sure that we have only have viscodes that we need
+sub_adni1lipidomicsrader <- sub_adni1lipidomicsrader %>%
+  filter(VISCODE %in% c("bl", "sc"))
 
+sub_zhang <- sub_zhang %>%
+  filter(VISCODE %in% c("bl", "sc"))
+
+sub_pet <- sub_pet %>%
+  filter(VISCODE %in% c("bl", "sc"))
+
+sub_vitals <- sub_vitals %>%
+  filter(VISCODE %in% c("bl", "sc"))
+
+sub_medical_hist <- sub_medical_hist %>%
+  filter(VISCODE %in% c("bl", "sc"))
+
+sub_medications <- sub_medications %>%
+  filter(VISCODE %in% c("bl", "sc"))
+
+sub_adnimerge <- sub_adnimerge %>%
+  filter(VISCODE %in% c("bl", "sc"))
+
+colnames(sub_adnimerge)
 ## join them all together
 master_df <- sub_adnimerge %>%
   # left_join(sub_gdscale, by = c("RID")) %>%
@@ -190,15 +212,16 @@ master_df <- sub_adnimerge %>%
   # left_join(sub_medhist, by = c("RID")) %>%
   # left_join(sub_zhang, by = c("RID", "VISCODE")) %>%
   # left_join(sub_cvrf, by = c("RID", "VISCODE")) %>%
-  left_join(adni1lipidomicsrader, by = c("RID", "VISCODE")) %>%
+  left_join(sub_adni1lipidomicsrader %>% select(RID, CHOL, HDL), by = c("RID")) %>%
   # left_join(sub_admcgctof, by = c("RID")) %>%
-  left_join(adni_pacc, by = c("RID", "VISCODE")) %>%
-  left_join(sub_pet, by = c("RID", "VISCODE")) %>%
-  left_join(sub_vitals, by = c("RID", "VISCODE")) %>%
-  left_join(sub_medical_hist, by = c("RID", "VISCODE")) %>%
-  left_join(sub_medications, by = c("RID", "VISCODE"))
+  left_join(adni_pacc %>% select(RID, ADASQ4, LDELTOTAL, DIGITSCOR, MMSE, TRABSCOR, mPACCdigit, mPACCtrailsB), 
+  by = c("RID")) %>%
+  left_join(sub_pet %>% select(RID, PHC_CENTILOIDS, PHC_AMYLOID_STATUS, PHC_CL_FAIL), by = c("RID")) %>%
+  left_join(sub_vitals %>% select(RID, VSBPSYS), by = c("RID")) %>%
+  left_join(sub_medical_hist %>% select(RID, IHDESC), by = c("RID")) %>%
+  left_join(sub_medications %>% select(RID, CMMED), by = c("RID"))
 
-dim(master_df) ## 19845 rows
+dim(master_df) ## 142898 rows
 colnames(master_df)
 
 write.csv(master_df, "data/master_df_raw.csv", row.names = FALSE)
@@ -207,7 +230,7 @@ write.csv(master_df, "data/master_df_raw.csv", row.names = FALSE)
 master_df <- master_df %>%
   distinct()  # keeps only unique rows
 
-dim(master_df) ## 16633 rows 
+dim(master_df) ## 109888 rows 
 length(unique(master_df$RID)) ## 2436 patients
 
 ### We want to allow for missigness for the individual analyiss in the final dataset (lmer)
@@ -235,11 +258,12 @@ length(unique(master_df$RID)) ## 2436 patients
 ### Develop a function to classify the risk factors based on measurements for chol, BMI, diabetes, and SBP
 ## turn risk factotrs into high or normal for patients
 
-# master_df$Chol_group <- ifelse(master_df$CHOL > 200, "High", "Normal")
-master_df$BMI_group <- ifelse(master_df$PHC_BMI >= 30, "Obese", "No Obesity")
+master_df$Chol_group_1 <- ifelse(master_df$CHOL > 200, "High", "Normal")
+# master_df$BMI_group <- ifelse(master_df$PHC_BMI >= 30, "Obese", "No Obesity")
 master_df$SBP_group <- ifelse(master_df$VSBPSYS > 140, "High", "Normal")
 master_df$PTEDUCAT_group <- ifelse(master_df$PTEDUCAT > 12, "High", "Low")
 
+library(stringr)
 master_df <- master_df %>%
 mutate(AAPOEGNPRSNFLG_all = case_when(
     APOE4 == 1 ~ "E4-",
@@ -249,44 +273,69 @@ mutate(AAPOEGNPRSNFLG_all = case_when(
 
 master_df <- master_df %>%
   mutate(
-    Diabetes_group = case_when(
+    Diabetes_group_1 = case_when(
       str_detect(tolower(IHDESC), "diabetes|mellitus") ~ "Yes",
+      TRUE ~ "No"
+    ))
+
+master_df <- master_df %>%
+  mutate(
+    Chol_group_2 = case_when(
+      str_detect(tolower(IHDESC), "cholesterol|hyperlipidemia") ~ "High",
+      TRUE ~ "Normal"
+    ))
+
+master_df <- master_df %>%
+  mutate(
+    Diabetes_group_2 = case_when(
+      str_detect(tolower(CMMED), "Humulin|Novolin|Fiasp|NovoLog|Afrezza|Admelog| 
+      Humalog|Lyumjev|Tresiba|insulin|Basaglar KwikPen|Lantus|Toujeo SoloStar|Semglee-yfgn| 
+      Amylinomimetic|acarbose|miglitol|Glyset|Kazano|Invokamet|Xigduo XR|Synjardy|Segluromet|
+      glipizide|Glucovance|Jentadueto|Actoplus Met|metformin|repaglinide|saxagliptin|Janumet|
+      Cycloset|alogliptin|Nesina|Kazano|Tradjenta|Glyxambi|Onglyza|Januvia|sitagliptin|simvastatin|
+      Trulicity|Byetta|Bydureon BCise|Saxenda|Victoza|lixisenatide|Ozempic|Mounjaro|Starlix|Prandin|
+      Invokana|Invokamet XR|Farxiga|Qtern|Jardiance|Trijardy XR|Synjardy XR|Steglatro|Amaryl|Duetact|gliclazide|
+      glipizide|Glipizide XL|Glucotrol XL|Glynase|Oseni|Actoplus Met XR|rosiglitazone|Lyumjev|Lyumjev KwikPen|
+      Tresiba|Semglee-yfgn|Humulin|NovoLog|Glyset|Kazano|Invokamet|Xigduo XR|Synjardy|Segluromet|Glucovance|
+      Jentadueto|Actoplus Met|Janumet|Cycloset|Nesina|Tradjenta|Glyxambi|Onglyza|Januvia|Trulicity|Byetta|
+      Bydureon BCise|Saxenda|Victoza") ~ "Yes",
       TRUE ~ "No"
     )
   )
 
 master_df <- master_df %>%
   mutate(
-    Chol_group = case_when(
-      str_detect(tolower(IHDESC), "cholesterol|hyperlipidemia") ~ "High",
+    Chol_group_3 = case_when(
+      str_detect(tolower(CMMED), "Lipitor|Lescol XL|Altoprev|Livalo|Pravachol|
+Crestor|Zocor|Zetia|Praluent|Repatha|Nexletol|Nexlizet|Prevalite|Welchol|Colestid|
+Vytorin|Caduet|Antara|Lipofen|Lopid|Niacor|Niaspan|Lovaza|Omacor|Vascepa|Atorvastatin|
+Fluvastatin|Lovastatin|Pitavastatin|Pravastatin|Rosuvastatin|Simvastatin|Ezetimibe|Alirocumab|
+Evolocumab|Bempedoic acid|Bempedoic acid-ezetimibe|Cholestyramine|Colesevelam|Colestipol| 
+Ezetimibe-simvastatin|Amlodipine-atorvastatin|Fenofibrate|Gemfibrozil|Niacin") ~ "High",
       TRUE ~ "Normal"
     )
   )
 
-# master_df <- master_df %>%
-#   mutate(
-#     Diabetes_group_2 = case_when(
-#       str_detect(tolower(CMMED), "Humulin" | "Novolin" | "Fiasp" | "NovoLog" | "Afrezza" | "Admelog" | "Humalog" | "Lyumjev" | "Tresiba" | "insulin" | "Basaglar KwikPen" | "Lantus" | "Toujeo SoloStar" | "Semglee-yfgn” | "Amylinomimetic" | "acarbose" | "miglitol" | "Glyset" | "Kazano" | "Invokamet" | "Xigduo XR" | "Synjardy" | "Segluromet" | "metformin/glipizide" | "Glucovance" | "Jentadueto" | "Actoplus Met" | "metformin” | "repaglinide" | "saxagliptin" | "Janumet" | "Cycloset" | "alogliptin" | "Nesina" | "Kazano" | "Tradjenta" | "Glyxambi" | "Onglyza" | "Januvia" | "sitagliptin" | "simvastatin" | "Trulicity" | "Byetta" | "Bydureon BCise" | "Saxenda" | "Victoza" | "lixisenatide" | "Ozempic" | "Mounjaro" | "Starlix" | "Prandin" | "Invokana" | "Invokamet XR" | "Farxiga" | "Qtern" | "Jardiance" | "Trijardy XR" | "Synjardy XR" | "Steglatro" | "Amaryl" | "Duetact" | "gliclazide" | "glipizide" | "Glipizide XL" | "Glucotrol XL" | "Glynase" | "Oseni" | "Actoplus Met XR" | "rosiglitazone" | "Lyumjev" | "Lyumjev KwikPen" | "Tresiba" | "Semglee-yfgn" | "Humulin" | "NovoLog" | "Glyset" | "Kazano" | "Invokamet" | "Xigduo XR" | "Synjardy" | "Segluromet" | "Glucovance" | "Jentadueto" | "Actoplus Met" | "Janumet" | "Cycloset" | "Nesina" | "Tradjenta" | "Glyxambi" | "Onglyza" | "Januvia" | "Trulicity" | "Byetta" | "Bydureon BCise" | "Saxenda" | "Victoza" | "Ozempic" | "Mounjaro" | "Starlix" | "Prandin" | "Invokana" | "Invokamet XR" | "Farxiga" | "Qtern" | "Jardiance" | "Trijardy XR" | "Synjardy XR" | "Steglatro" | "Amaryl" | "Duetact" | "Glipizide XL" | "Glucotrol XL" | "Glynase" | "Oseni") ~ "Yes",
-#       TRUE ~ "No"
-#     )
-#   )
+###We Want to do then combine the diabetes and chol columns to put its as a yes or no for all of the patients 
+master_df <- master_df %>%
+  mutate(
+    Diabetes_group = case_when(
+      Diabetes_group_1 == "Yes" | Diabetes_group_2 == "Yes" ~ "Yes",
+      Diabetes_group_1 == "No"  & Diabetes_group_2 == "No"  ~ "No",
+      TRUE ~ NA_character_
+    )
+  )
 
-# master_df <- master_df %>%
-#   mutate(
-#     Chol_group_2 = case_when(
-#       str_detect(tolower(CMMED), "Lipitor" | "Lescol XL" | "Altoprev" | "Livalo" | "Pravachol" |
-# "Crestor" | "Zocor" | "Zetia" | "Praluent" | "Repatha" | "Nexletol" | "Nexlizet" |
-# "Prevalite" | "Welchol" | "Colestid" | "Vytorin" | "Caduet" |
-# "Antara" | "Lipofen" | "Lopid" | "Niacor" | "Niaspan" |
-# "Lovaza" | "Omacor" | "Vascepa" | "Atorvastatin" | "Fluvastatin" | "Lovastatin" | 
-# "Pitavastatin" | "Pravastatin" | "Rosuvastatin" | "Simvastatin" | "Ezetimibe" | 
-# "Alirocumab" | "Evolocumab" | "Bempedoic acid" | "Bempedoic acid-ezetimibe" | 
-# "Cholestyramine" | "Colesevelam" | "Colestipol" | "Ezetimibe-simvastatin" | 
-# "Amlodipine-atorvastatin" | "Fenofibrate" | "Gemfibrozil" | "Niacin")
-#        ~ "High",
-#       TRUE ~ "Normal"
-#     )
-#   )
+master_df <- master_df %>%
+  mutate(
+    Chol_group = case_when(
+      Chol_group_1 == "High" | Chol_group_2 == "High" | Chol_group_3 == "High" ~ "High",
+      Chol_group_1 == "No"  & Chol_group_2 == "No" & Chol_group_3 == "No" ~ "No",
+      TRUE ~ NA_character_
+    )
+  )
+
+
 
 ## change names of columns for varaibles to use to replicate the code seamlessly
 master_df$year <- as.numeric(master_df$Years.bl)
@@ -299,7 +348,7 @@ master_df$BID <- master_df$PTID.x
 master_df$PTEDUCAT_all <- master_df$PTEDUCAT
 
 
-
+write.csv(master_df, "data/master_df_raw.csv", row.names = FALSE)
 
 head(master_df, 5)
 dim(master_df)
@@ -323,6 +372,8 @@ master_df %>%
 unique(master_df$PHC_AMYLOID_STATUS)
 unique(master_df$Diabetes_group)
 colnames(master_df)
+dim(master_df) ### 109888 entries
+unique(master_df$RID) ### 2436 unique patients
 
 # library(dplyr)
 
