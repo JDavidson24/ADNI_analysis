@@ -274,7 +274,7 @@ mutate(AAPOEGNPRSNFLG_all = case_when(
 master_df <- master_df %>%
   mutate(
     Diabetes_group_1 = case_when(
-      str_detect(tolower(IHDESC), "diabetes|mellitus") ~ "Yes",
+      str_detect(tolower(IHDESC), "diabetic|DM|diabetes|mellitus") ~ "Yes",
       TRUE ~ "No"
     ))
 
@@ -362,11 +362,6 @@ dim(master_df)
 
 master_df <- read.csv("data/master_df_raw.csv")
 head(master_df, 5)
-
-master_df %>%
-  arrange(desc(PTID.x)) %>%  # sort descending by emmean
-  head(10) 
-
 
 
 unique(master_df$PHC_AMYLOID_STATUS)
@@ -459,7 +454,7 @@ all_risk_factor_df$SBP_group_all <- all_risk_factor_df$SBP_group
 all_risk_factor_df$Chol200_group_all <- all_risk_factor_df$Chol200_group
 all_risk_factor_df$HbA1c6.5_group_all <- all_risk_factor_df$HbA1c6.5_group
 
-colnames(PACC_all)
+
 ###create base columns that match the code by taking the coresponding entry for age, marry, gender columns, ethnic
 
 all_risk_factor_df <- all_risk_factor_df %>%
@@ -508,19 +503,22 @@ all_risk_factor_df <- all_risk_factor_df %>%
   mutate(PTEDUCAT_group = ifelse(row_number() == 1, first(PTEDUCAT_all), NA)) %>%
   ungroup()
 
+all_risk_factor_df <- all_risk_factor_df %>%
+  distinct()
+
 head(all_risk_factor_df$PTEDUCAT_group, 5)
 colnames(all_risk_factor_df)
 length(unique(all_risk_factor_df$RID)) ## 2436 unique patients
-dim(all_risk_factor_df) ## 19845 rows
+dim(all_risk_factor_df) ## 109888 rows
 write.csv(all_risk_factor_df, "data/all_risk_factor_df_raw.csv", row.names = FALSE)
 
 
 
 ## Subset the data to only include patients with PET imaging data and are cognitively normal (CN) at baseline
 cn_risk_factor_df <- all_risk_factor_df %>%
-  filter(DX.bl.x == "CN")
+  filter(DX.bl == "CN")
 
-dim(cn_risk_factor_df) ## 4975 rows
+dim(cn_risk_factor_df) ## 36341 rows
 length(unique(cn_risk_factor_df$RID)) ## 543 unique patients
 write.csv(cn_risk_factor_df, "data/cn_risk_factor_df_raw.csv", row.names = FALSE)
 
