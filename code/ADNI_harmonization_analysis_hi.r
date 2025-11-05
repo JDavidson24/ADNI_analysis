@@ -275,13 +275,6 @@ colnames(df_dm_cn)
 unique(df_dm_cn$PTRACCAT) #Race categories 
 unique((adnimerge$PTMARRY))
 
-# PACC_HbA1c_spline <- lmer(
-#   PACC.raw ~ ns(year, df = 3) * HbA1c_G4 +
-#     PTAGE_all + PTGENDER_all + PTMARRY_all +
-#     AAPOEGNPRSNFLG_all + PTETHNIC_all +
-#     (1 | BID),
-#   data = PACC_all
-# )
 
 # Group 4 level comparisons (intecept)
 em_intercept <- emmeans(
