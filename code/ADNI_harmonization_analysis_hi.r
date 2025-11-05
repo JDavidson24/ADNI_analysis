@@ -16,6 +16,12 @@ install.packages("yardstick")
 library(yardstick)
 install.packages("data/ADNIMERGE", repos = NULL, type = "source")
 library(ADNIMERGE)
+library(lme4)
+library(emmeans)
+library(ggplot2)
+library(dplyr)
+library(splines)
+library(grid)
 
 # load adni
 # data(adnimerge)
@@ -34,9 +40,12 @@ vitals <- read.csv("data/Vitals/VITALS_21Oct2025.csv")
 medications <- read.csv("data/Medication/RECCMEDS_21Oct2025.csv")
 medical_hist <- read.csv("data/Medical_History/INITHEALTH_21Oct2025.csv")
 
+data(adnimerge)
+colnames(adnimerge)
+
 dbl <- adnimerge %>% 
   filter(VISCODE == "bl") %>% 
-  select(RID, AGE, PTGENDER, PTEDUCAT, PTETHCAT, PTRACCAT, DX.bl, APOE4)
+  select(RID, AGE, PTGENDER, PTEDUCAT, PTMARRY, PTETHCAT, PTRACCAT, DX.bl, APOE4)
 
 # check if dbl$RID is unique
 length(unique(dbl$RID)) == nrow(dbl)
@@ -47,6 +56,7 @@ colnames(dbl)
 sapply(dbl,class)
 attributes(dbl$DX.bl)
 attributes(dbl$AGE)
+attributes(dbl$PTMARRY)
 attributes(dbl$PTGENDER)
 attributes(dbl$PTEDUCAT)
 attributes(dbl$PTETHCAT)
@@ -60,6 +70,7 @@ dbl <- dbl %>%
     AGE = as.numeric(AGE),
     PTGENDER = as.factor(as.character(PTGENDER)),
     PTEDUCAT = as.numeric(PTEDUCAT),
+    PTMARRY = as.factor(as.character(PTMARRY)),
     PTETHCAT = as.factor(as.character(PTETHCAT)),
     PTRACCAT = as.factor(as.character(PTRACCAT)),
     DX.bl = as.factor(as.character(DX.bl)),
@@ -68,12 +79,12 @@ dbl <- dbl %>%
 
 skim(dbl) # some missing in APOE4 ##2436 rows
 
+table(dbl$APOE4)
 # make a complete dataset for baseline variables
 dbl_set <- dbl[complete.cases(dbl), ]
 # check the ID uniquness
 length(unique(dbl_set$RID)) == nrow(dbl_set)
 skim(dbl_set) # n rows = 2393
-
 
 # PET status (should be defined at baseline)
 pet <- read.csv("data/Image_Analyses/ADSP_PHC_PET_Amyloid_Simple_18Sep2025.csv") %>%
@@ -87,7 +98,7 @@ table(pet_bl$PHC_AMYLOID_STATUS)
 
 # combine bl pet with dbl_set
 dbl_pet <- inner_join(dbl_set, pet_bl, by = "RID")
-skim(dbl_pet) # 1536    #145 rows
+skim(dbl_pet) # 1536 rows
 dbl_pet %>% with(table(DX.bl, PHC_AMYLOID_STATUS))
 
 # picc outcome - longitudinal
@@ -116,7 +127,7 @@ skim(adni_pacc_complete) # n rows = 11508
 df = inner_join(adni_pacc_complete, dbl_pet, by = "RID")
 df %>% with(table(month, PHC_AMYLOID_STATUS))
 
-skim(df) # nrows 6318 (#353 rows actually)
+skim(df) # nrows 6317
 
 
 # Baseline DX.bl vs PHC_AMYLOID_STATUS
@@ -176,28 +187,101 @@ id_all = union(id_med_bl_all, id_hist_sc_all)
 df_dm = df %>% filter(RID %in% id_all) %>%
   mutate(DM = if_else(RID %in% id_dm, 1, 0)) %>%
   mutate(DM_G4 = case_when(
-    (PHC_AMYLOID_STATUS==1)&(DM == 1) ~ "Abeta yes DM yes",
-    (PHC_AMYLOID_STATUS==1)&(DM == 0) ~ "Abeta yes DM no",
-    (PHC_AMYLOID_STATUS==0)&(DM == 1) ~ "Abeta no DM yes",
-    (PHC_AMYLOID_STATUS==0)&(DM == 0) ~ "Abeta no DM no",
+    (PHC_AMYLOID_STATUS==1)&(DM == 1) ~ "A4.High",
+    (PHC_AMYLOID_STATUS==1)&(DM == 0) ~ "A4.Normal",
+    (PHC_AMYLOID_STATUS==0)&(DM == 1) ~ "Learn.High",
+    (PHC_AMYLOID_STATUS==0)&(DM == 0) ~ "Learn.Normal",
   )) %>% 
   filter(!is.na(DM_G4)) %>%
   mutate(
-    DM_G4 = factor(DM_G4, levels = c("Abeta no DM no", "Abeta no DM yes", "Abeta yes DM no", "Abeta yes DM yes")),
+    DM_G4 = factor(DM_G4, levels = c("A4.High","A4.Normal","Learn.High","Learn.Normal")),
     APOEe4_carrier = if_else(APOE4 %in% c("1", "2"), 1, 0),
     year = month / 12
   )
 
-skim(df_dm) # nrows 6315 will be in the analysis. ##353 rows will be in the analysis
+skim(df_dm) # nrows 6314 will be in the analysis. 
 
 df_dm_ad = df_dm %>% filter(DX.bl == "AD")
 df_dm_mci = df_dm %>% filter(DX.bl %in% c("EMCI", "LMCI", 'SMC'))
 df_dm_cn = df_dm %>% filter(DX.bl == "CN")
 
+##bootstrap the Data
+library(lme4)
+install.packages("lmeresampler")
+library(lmeresampler)
+library(emmeans)
+library(dplyr)
+
+# Fit the LMER model (Your original code)
+model <- lmer(
+  mPACCdigit ~ year * DM_G4 + AGE + PTGENDER + PTMARRY + APOEe4_carrier + PTETHCAT + (1 | RID),
+  data = df_dm_cn
+)
+
+# Parametric bootstrap
+set.seed(123)
+boot_model <- bootstrap(
+  model = model,
+  .f = function(fit) fixef(fit), # extract fixed effects
+  type = "parametric",           # parametric bootstrap
+  B = 1000                       # number of bootstrap samples
+)
+
+#Bootstrap estimates matrix
+boot_est <- as.matrix(boot_model$replicates)
+colnames(boot_est) <- names(fixef(model))  # ensure coefficient names are correct
+
+ci_direct <- apply(boot_est, 2, quantile, probs = c(0.025, 0.975))
+# Extract the lower and upper bounds
+ci_lower_direct <- ci_direct[1, ] # 0.025 quantile
+ci_upper_direct <- ci_direct[2, ] # 0.975 quantile
+
+# Two-sided p-value = proportion of bootstrap samples crossing zero
+pvals_robust <- apply(boot_est, 2, function(x) {
+  # 2 * minimum proportion of replicates greater/less than zero
+  p_val <- 2 * min(mean(x <= 0), mean(x >= 0))
+  min(p_val, 1)
+})
+
+results <- data.frame(
+  Estimate = fixef(model),
+  CI_lower = ci_lower_direct,
+  CI_upper = ci_upper_direct,
+  p_value = pvals_robust
+)
+results
+
+
 #### ANALYSIS ####
-PACC_DM <- lmer(mPACCdigit ~ year * DM_G4 + AGE + PTGENDER + APOEe4_carrier + PTRACCAT + PTEDUCAT + (1 | RID), data = df_dm_cn)
+PACC_DM <- lmer(mPACCdigit ~ ns(year, df = 3) * DM_G4 + AGE + PTGENDER + PTMARRY + APOEe4_carrier + PTETHCAT + (1 | RID), data = df_dm_cn)
 
 summary(PACC_DM)
+
+
+###Perform a model comparison to see the effect of adding each covariate step by step
+m1 <- lmer(mPACCdigit ~ year + (1 | RID), data = df_dm_cn, REML = FALSE)
+m2 <- lmer(mPACCdigit ~ year * DM_G4 + (1 | RID), data = df_dm_cn, REML = FALSE)
+m3 <- lmer(mPACCdigit ~ year * DM_G4 + AGE + (1 | RID), data = df_dm_cn, REML = FALSE)
+m4 <- lmer(mPACCdigit ~ year * DM_G4 + AGE + PTGENDER + (1 | RID), data = df_dm_cn, REML = FALSE)
+m5 <- lmer(mPACCdigit ~ year * DM_G4 + AGE + PTGENDER + APOEe4_carrier + (1 | RID), data = df_dm_cn, REML = FALSE)
+m6 <- lmer(mPACCdigit~ year * DM_G4 + AGE + PTGENDER + APOEe4_carrier + PTMARRY + (1 | RID), data = df_dm_cn, REML = FALSE)
+m7 <- lmer(mPACCdigit ~ year * DM_G4 + AGE + PTGENDER + APOEe4_carrier + PTMARRY + PTETHCAT + (1 | RID), data = df_dm_cn, REML = FALSE)
+
+anova(m1, m2, m3, m4, m5, m6, m7)
+
+
+table(df_dm_cn$APOEe4_carrier)
+colnames(df_dm_cn)
+unique(df_dm_cn$PTRACCAT) #Race categories 
+unique((adnimerge$PTMARRY))
+
+# PACC_HbA1c_spline <- lmer(
+#   PACC.raw ~ ns(year, df = 3) * HbA1c_G4 +
+#     PTAGE_all + PTGENDER_all + PTMARRY_all +
+#     AAPOEGNPRSNFLG_all + PTETHNIC_all +
+#     (1 | BID),
+#   data = PACC_all
+# )
 
 # Group 4 level comparisons (intecept)
 em_intercept <- emmeans(
@@ -213,6 +297,7 @@ contrast(em_intercept, list("Interaction worse than additive" = c(1, -1, -1, 1))
 # 1-to-1 comparisons
 pairs(em_intercept, adjust = "tukey")  # 或 adjust = "tukey" 做多重比較校正
 
+
 # Group 4 level comparisons (slope)
 em_slope <- emtrends(
   PACC_DM,
@@ -226,7 +311,7 @@ pairs(em_slope, adjust = "tukey")
 
 
 
-# Cholesterol exposure dataset
+##### Cholesterol exposure dataset ###
 med_bl <- medications %>% filter(VISCODE2 %in% c('bl', 'sc'))
 id_med_bl_all = unique(med_bl$RID)
 length(id_med_bl_all) ##3948
@@ -291,34 +376,93 @@ id_all = union(union(id_med_bl_all, id_hist_sc_all), id_lipid_bl_all)
 df_chol = df %>% filter(RID %in% id_all) %>%
   mutate(Chol = if_else(RID %in% id_chol, 1, 0)) %>%
   mutate(Chol_G4 = case_when(
-    (PHC_AMYLOID_STATUS==1)&(Chol == 1) ~ "Abeta yes Chol yes",
-    (PHC_AMYLOID_STATUS==1)&(Chol == 0) ~ "Abeta yes Chol no",
-    (PHC_AMYLOID_STATUS==0)&(Chol == 1) ~ "Abeta no Chol yes",
-    (PHC_AMYLOID_STATUS==0)&(Chol == 0) ~ "Abeta no Chol no",
+    (PHC_AMYLOID_STATUS==1)&(Chol == 1) ~ "A4.High",
+    (PHC_AMYLOID_STATUS==1)&(Chol == 0) ~ "A4.Normal",
+    (PHC_AMYLOID_STATUS==0)&(Chol == 1) ~ "Learn.High",
+    (PHC_AMYLOID_STATUS==0)&(Chol == 0) ~ "Learn.Normal",
   )) %>% 
   filter(!is.na(Chol_G4)) %>%
   mutate(
-    Chol_G4 = factor(Chol_G4, levels = c("Abeta no Chol no", "Abeta no Chol yes", "Abeta yes Chol no", "Abeta yes Chol yes")),
+    Chol_G4 = factor(Chol_G4, levels = c("A4.High","A4.Normal","Learn.High","Learn.Normal")),
     APOEe4_carrier = if_else(APOE4 %in% c("1", "2"), 1, 0),
     year = month / 12
   )
 
-skim(df_dm) ###353 rows will be in the analysis
+# master_df <- master_df %>%
+# mutate(AAPOEGNPRSNFLG_all = case_when(
+#     APOE4 == 1 ~ "E4-",
+#     APOE4 == 2 ~ "E4+",
+#     TRUE ~ "NA"
+#   ))
+
+skim(df_dm) ###6314 rows will be in the analysis
 
 df_chol_ad = df_chol %>% filter(DX.bl == "AD")
 df_chol_mci = df_chol %>% filter(DX.bl %in% c("EMCI", "LMCI", 'SMC'))
 df_chol_cn = df_chol %>% filter(DX.bl == "CN")
 
 #### Cholesterol ANALYSIS ####
+# Fit the LMER model
+model <- lmer(
+  mPACCdigit ~ year * Chol_G4 + AGE + PTGENDER + PTMARRY + APOEe4_carrier + PTETHCAT + (1 | RID),
+  data = df_chol_cn
+)
 
-PACC_CHOL <- lmer(mPACCdigit ~ year * DM_G4 + AGE + PTGENDER + APOEe4_carrier + PTRACCAT + PTEDUCAT + (1 | RID), data = df_dm_cn)
+# Parametric bootstrap
+set.seed(123)
+boot_model <- bootstrap(
+  model = model,
+  .f = function(fit) fixef(fit), # extract fixed effects
+  type = "parametric",           # parametric bootstrap
+  B = 1000                       # number of bootstrap samples
+)
+
+#Bootstrap estimates matrix
+boot_est <- as.matrix(boot_model$replicates)
+colnames(boot_est) <- names(fixef(model))  # ensure coefficient names are correct
+
+ci_direct <- apply(boot_est, 2, quantile, probs = c(0.025, 0.975))
+# Extract the lower and upper bounds
+ci_lower_direct <- ci_direct[1, ] # 0.025 quantile
+ci_upper_direct <- ci_direct[2, ] # 0.975 quantile
+
+# Two-sided p-value = proportion of bootstrap samples crossing zero
+pvals_robust <- apply(boot_est, 2, function(x) {
+  # 2 * minimum proportion of replicates greater/less than zero
+  p_val <- 2 * min(mean(x <= 0), mean(x >= 0))
+  min(p_val, 1)
+})
+
+results <- data.frame(
+  Estimate = fixef(model),
+  CI_lower = ci_lower_direct,
+  CI_upper = ci_upper_direct,
+  p_value = pvals_robust
+)
+results
+
+
+PACC_CHOL <- lmer(mPACCdigit ~ ns(year, df = 3) * Chol_G4 + AGE + PTGENDER + PTMARRY + APOEe4_carrier + PTETHCAT + (1 | RID), data = df_chol_cn)
 
 summary(PACC_CHOL)
 
+###Perform a model comparison to see the effect of adding each covariate step by step
+m1 <- lmer(mPACCdigit ~ ns(year, df = 3) + (1 | RID), data = df_chol_cn, REML = FALSE)
+m2 <- lmer(mPACCdigit ~ ns(year, df = 3) * Chol_G4 + (1 | RID), data = df_chol_cn, REML = FALSE)
+m3 <- lmer(mPACCdigit ~ ns(year, df = 3) * Chol_G4 + AGE + (1 | RID), data = df_chol_cn, REML = FALSE)
+m4 <- lmer(mPACCdigit ~ ns(year, df = 3) * Chol_G4 + AGE + PTGENDER + (1 | RID), data = df_chol_cn, REML = FALSE)
+m5 <- lmer(mPACCdigit ~ ns(year, df = 3) * Chol_G4 + AGE + PTGENDER + APOEe4_carrier + (1 | RID), data = df_chol_cn, REML = FALSE)
+m6 <- lmer(mPACCdigit~ ns(year, df = 3) * Chol_G4 + AGE + PTGENDER + APOEe4_carrier + PTMARRY + (1 | RID), data = df_chol_cn, REML = FALSE)
+m7 <- lmer(mPACCdigit ~ ns(year, df = 3) * Chol_G4 + AGE + PTGENDER + APOEe4_carrier + PTMARRY + PTETHCAT + (1 | RID), data = df_chol_cn, REML = FALSE)
+
+anova(m1, m2, m3, m4, m5, m6, m7)
+
+table(df_chol_cn$APOEe4_carrier)
+
 # Group 4 level comparisons (intecept)
 em_intercept <- emmeans(
-  PACC_DM,
-  ~ DM_G4,
+  PACC_CHOL,
+  ~ Chol_G4,
   at = list(year = 0),
   lmerTest.limit = 1e5,
   pbkrtest.limit = 1e5
@@ -331,10 +475,32 @@ pairs(em_intercept, adjust = "tukey")  # 或 adjust = "tukey" 做多重比較校
 
 # Group 4 level comparisons (slope)
 em_slope <- emtrends(
-  PACC_DM,
-  ~ DM_G4,
+  PACC_CHOL,
+  ~ Chol_G4,
   var = "year"
 )
 summary(em_slope)
 contrast(em_slope, list("Interaction worse than additive" = c(1, -1, -1, 1)))
 pairs(em_slope, adjust = "tukey")
+
+
+library(readr)
+library(skimr)
+library(writexl)
+
+# Generate descriptive statistics for all_risk_factor_df
+summary_stats <- skim(df_dm_cn)
+summary_export <- as.data.frame(summary_stats)
+
+# Export to Excel for all_risk_factor_df
+write_xlsx(summary_export, "data/dm_Descriptive_Statistics.xlsx")
+
+# Generate descriptive statistics for cn_risk_factor_df
+summary_stats <- skim(df_chol_cn)
+summary_export <- as.data.frame(summary_stats)
+
+# Export to Excel for cn_risk_factor_df
+write_xlsx(summary_export, "data/chol_Descriptive_Statistics.xlsx")
+
+skim(df_dm_cn)
+skim(df_chol_cn)
