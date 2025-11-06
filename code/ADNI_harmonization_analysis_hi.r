@@ -144,17 +144,17 @@ id_med_bl_all = unique(med_bl$RID)
 length(id_med_bl_all) #3948
 id_med_bl_dm <- med_bl %>%
   mutate(DMMED = case_when(
-      str_detect(tolower(CMMED), "Humulin|Novolin|Fiasp|NovoLog|Afrezza|Admelog| 
-      Humalog|Lyumjev|Tresiba|insulin|Basaglar KwikPen|Lantus|Toujeo SoloStar|Semglee-yfgn| 
-      Amylinomimetic|acarbose|miglitol|Glyset|Kazano|Invokamet|Xigduo XR|Synjardy|Segluromet|
-      glipizide|Glucovance|Jentadueto|Actoplus Met|metformin|repaglinide|saxagliptin|Janumet|
-      Cycloset|alogliptin|Nesina|Kazano|Tradjenta|Glyxambi|Onglyza|Januvia|sitagliptin|simvastatin|
-      Trulicity|Byetta|Bydureon BCise|Saxenda|Victoza|lixisenatide|Ozempic|Mounjaro|Starlix|Prandin|
-      Invokana|Invokamet XR|Farxiga|Qtern|Jardiance|Trijardy XR|Synjardy XR|Steglatro|Amaryl|Duetact|gliclazide|
-      glipizide|Glipizide XL|Glucotrol XL|Glynase|Oseni|Actoplus Met XR|rosiglitazone|Lyumjev|Lyumjev KwikPen|
-      Tresiba|Semglee-yfgn|Humulin|NovoLog|Glyset|Kazano|Invokamet|Xigduo XR|Synjardy|Segluromet|Glucovance|
-      Jentadueto|Actoplus Met|Janumet|Cycloset|Nesina|Tradjenta|Glyxambi|Onglyza|Januvia|Trulicity|Byetta|
-      Bydureon BCise|Saxenda|Victoza") ~ "Yes",
+      str_detect(tolower(CMMED), "humulin|novolin|fiasp|novoLog|afrezza|admelog| 
+      humalog|lyumjev|tresiba|insulin|basaglar|kwikpen|lantus|toujeo solostar|semglee| 
+      amylinomimetic|acarbose|miglitol|glyset|kazano|invokamet|xigduo|synjardy|segluromet|
+      glipizide|glucovance|jentadueto|actoplus|met|metformin|repaglinide|saxagliptin|janumet|
+      cycloset|alogliptin|nesina|kazano|tradjenta|glyxambi|onglyza|januvia|sitagliptin|simvastatin|
+      trulicity|byetta|bydureon|bCise|saxenda|victoza|lixisenatide|ozempic|mounjaro|starlix|prandin|
+      invokana|invokamet|farxiga|qtern|jardiance|trijardy|synjardy|steglatro|amaryl|duetact|gliclazide|
+      glipizide|glucotrol|glynase|oseni|actoplus|rosiglitazone|lyumjev|lyumjev|
+      tresiba|Semglee-yfgn|humulin|novoLog|glyset|kazano|invokamet|xigduo|synjardy|segluromet|glucovance|
+      jentadueto|actoplus|janumet|cycloset|nesina|tradjenta|glyxambi|onglyza|januvia|trulicity|byetta|
+      bydureon|bcise|saxenda|victoza") ~ "Yes",
       TRUE ~ "No"
     )
   ) %>% filter(DMMED == "Yes") %>% pull(RID) %>% unique()
@@ -198,6 +198,8 @@ df_dm = df %>% filter(RID %in% id_all) %>%
     APOEe4_carrier = if_else(APOE4 %in% c("1", "2"), 1, 0),
     year = month / 12
   )
+
+
 
 skim(df_dm) # nrows 6314 will be in the analysis. 
 
@@ -253,7 +255,7 @@ results
 
 
 #### ANALYSIS ####
-PACC_DM <- lmer(mPACCdigit ~ ns(year, df = 3) * DM_G4 + AGE + PTGENDER + PTMARRY + APOEe4_carrier + PTETHCAT + (1 | RID), data = df_dm_cn)
+PACC_DM <- lmer(mPACCdigit ~ year * DM_G4 + AGE + PTGENDER + PTMARRY + APOEe4_carrier + PTETHCAT + (1 | RID), data = df_dm_mci)
 
 summary(PACC_DM)
 
@@ -301,7 +303,28 @@ summary(em_slope)
 contrast(em_slope, list("Interaction worse than additive" = c(1, -1, -1, 1)))
 pairs(em_slope, adjust = "tukey")
 
+install.packages("broom.mixed")
+library(broom.mixed)
 
+# Tidy fixed effects table
+tbl_fixed <- tidy(PACC_DM, effects = "fixed")
+
+# View table
+print(tbl_fixed)
+
+# Save as CSV
+write.csv(tbl_fixed, "data/plots/PACC_DM_fixed_effects.csv", row.names = FALSE)
+
+
+# Intercept emmeans
+em_int <- emmeans(PACC_CHOL, ~ DM_G4, at = list(year = 0))
+tbl_em_int <- summary(em_int)
+write.csv(tbl_em_int, "data/plots/PACC_DM_emmeans_intercept.csv", row.names = FALSE)
+
+# Slope emmeans
+em_slope <- emtrends(PACC_CHOL, ~ DM_G4, var = "year")
+tbl_em_slope <- summary(em_slope)
+write.csv(tbl_em_slope, "data/plotsPACC_DM_emmeans_slope.csv", row.names = FALSE)
 
 
 ##### Cholesterol exposure dataset ###
@@ -310,13 +333,13 @@ id_med_bl_all = unique(med_bl$RID)
 length(id_med_bl_all) ##3948
 id_med_bl_chol <- med_bl %>%
   mutate(CHOLMED = case_when(
-      str_detect(tolower(CMMED), "Lipitor|Lescol XL|Altoprev|Livalo|Pravachol|
-Crestor|Zocor|Zetia|Praluent|Repatha|Nexletol|Nexlizet|Prevalite|Welchol|Colestid|
-Vytorin|Caduet|Antara|Lipofen|Lopid|Niacor|Niaspan|Lovaza|Omacor|Vascepa|Atorvastatin|
-Fluvastatin|Lovastatin|Pitavastatin|Pravastatin|Rosuvastatin|Simvastatin|Ezetimibe|Alirocumab|
-Evolocumab|Bempedoic acid|Bempedoic acid-ezetimibe|Cholestyramine|Colesevelam|Colestipol| 
-Ezetimibe-simvastatin|Amlodipine-atorvastatin|Fenofibrate|Gemfibrozil|Niacint|Cycloset|Nesina|Tradjenta|Glyxambi|Onglyza|Januvia|Trulicity|Byetta|
-      Bydureon BCise|Saxenda|Victoza") ~ "High",
+      str_detect(tolower(CMMED), "lipitor|lescol|altoprev|livalo|pravachol|
+crestor|zocor|zetia|praluent|repatha|nexletol|nexlizet|prevalite|welchol|colestid|
+vytorin|caduet|antara|lipofen|lopid|niacor|niaspan|lovaza|omacor|vascepa|atorvastatin|
+fluvastatin|lovastatin|pitavastatin|pravastatin|rosuvastatin|simvastatin|ezetimibe|alirocumab|
+evolocumab|bempedoic|bempedoic acid-ezetimibe|cholestyramine|colesevelam|colestipol| 
+ezetimibe|simvastatin|amlodipine|atorvastatin|fenofibrate|gemfibrozil|niacint|cycloset|nesina|tradjenta|glyxambi|onglyza|januvia|trulicity|byetta|
+      bydureon|saxenda|victoza") ~ "High",
       TRUE ~ "Normal"
     )
   ) %>% filter(CHOLMED == "High") %>% pull(RID) %>% unique()
@@ -381,18 +404,13 @@ df_chol = df %>% filter(RID %in% id_all) %>%
     year = month / 12
   )
 
-# master_df <- master_df %>%
-# mutate(AAPOEGNPRSNFLG_all = case_when(
-#     APOE4 == 1 ~ "E4-",
-#     APOE4 == 2 ~ "E4+",
-#     TRUE ~ "NA"
-#   ))
 
 skim(df_dm) ###6314 rows will be in the analysis
 
 df_chol_ad = df_chol %>% filter(DX.bl == "AD")
 df_chol_mci = df_chol %>% filter(DX.bl %in% c("EMCI", "LMCI", 'SMC'))
 df_chol_cn = df_chol %>% filter(DX.bl == "CN")
+
 
 #### Cholesterol ANALYSIS ####
 # Fit the LMER model
@@ -435,7 +453,7 @@ results <- data.frame(
 results
 
 
-PACC_CHOL <- lmer(mPACCdigit ~ ns(year, df = 3) * Chol_G4 + AGE + PTGENDER + PTMARRY + APOEe4_carrier + PTETHCAT + (1 | RID), data = df_chol_cn)
+PACC_CHOL <- lmer(mPACCdigit ~ year * Chol_G4 + AGE + PTGENDER + PTMARRY + PTETHCAT + (1 | RID), data = df_chol_mci)
 
 summary(PACC_CHOL)
 
@@ -476,24 +494,95 @@ summary(em_slope)
 contrast(em_slope, list("Interaction worse than additive" = c(1, -1, -1, 1)))
 pairs(em_slope, adjust = "tukey")
 
+# install.packages("broom.mixed")
+library(broom.mixed)
 
+# Tidy fixed effects table
+tbl_fixed <- tidy(PACC_CHOL, effects = "fixed")
+
+# View table
+print(tbl_fixed)
+
+# Save as CSV
+write.csv(tbl_fixed, "PACC_CHOL_fixed_effects.csv", row.names = FALSE)
+
+
+# Intercept emmeans
+em_int <- emmeans(PACC_CHOL, ~ Chol_G4, at = list(year = 0))
+tbl_em_int <- summary(em_int)
+write.csv(tbl_em_int, "data/plots/PACC_CHOL_emmeans_intercept.csv", row.names = FALSE)
+
+# Slope emmeans
+em_slope <- emtrends(PACC_CHOL, ~ Chol_G4, var = "year")
+tbl_em_slope <- summary(em_slope)
+write.csv(tbl_em_slope, "data/plotsPACC_CHOL_emmeans_slope.csv", row.names = FALSE)
+
+
+
+
+
+# Generate descriptive statistics for all_risk_factor_df
 library(readr)
 library(skimr)
 library(writexl)
 
-# Generate descriptive statistics for all_risk_factor_df
-summary_stats <- skim(df_dm_cn)
+summary_stats <- skim(df_dm_ad)
 summary_export <- as.data.frame(summary_stats)
 
 # Export to Excel for all_risk_factor_df
-write_xlsx(summary_export, "data/dm_Descriptive_Statistics.xlsx")
+write_xlsx(summary_export, "data/descriptive_stats/dm_ad_Descriptive_Statistics.xlsx")
 
 # Generate descriptive statistics for cn_risk_factor_df
-summary_stats <- skim(df_chol_cn)
+summary_stats <- skim(df_chol_ad)
 summary_export <- as.data.frame(summary_stats)
 
 # Export to Excel for cn_risk_factor_df
-write_xlsx(summary_export, "data/chol_Descriptive_Statistics.xlsx")
+write_xlsx(summary_export, "data/descriptive_stats/chol_ad_Descriptive_Statistics.xlsx")
 
-skim(df_dm_cn)
-skim(df_chol_cn)
+
+
+
+
+####### Create a table 1 of the controls and the MCI groups for both cholesterol/diabetes and amyloid status######
+install.packages('car')
+library(car)
+install.packages('table1')
+library(table1)
+
+
+# # ##function to add p value to the table
+pvalue <- function(x, ...) {
+  # Construct vectors of data y, and groups (strata) g
+  y <- unlist(x)
+  g <- factor(rep(1:length(x), times=sapply(x, length)))
+  if (is.numeric(y)) {
+    # For numeric variables, perform an ANOVA
+    p <- summary(aov(y ~ g))[[1]][["Pr(>F)"]][1]
+  } else {
+    # For categorical variables, perform a chi-squared test of independence
+    p <- chisq.test(table(y, g))$p.value
+  }
+  # Format the p-value, using an HTML entity for the less-than sign.
+  # The initial empty string places the output on the line below the variable label.
+  c("", sub("<", "&lt;", format.pval(p, digits=3, eps=0.001)))
+}
+
+# # #simple study characteristics table for each ADI rank w/ treatments, age, sex, race, HbA1c, and insrance status df
+caption <- 'Study Characteristics Table'               
+
+#use table1 function to create the table
+tbl <- table1::table1(~ PTGENDER + PTETHCAT + PTEDUCAT + PTRACCAT + PTMARRY + AGE + DM_G4 | APOEe4_carrier, data = df_chol, render.missing = NULL, overall = c(Left = 'Total'), extra.col=list(`P_Value`=pvalue), groupspan=c(1, 1, 2), caption = caption, topclass="Rtable1-zebra")
+
+# # ### turn table 1 into a data frame to save as a csv
+tbl_df <- as.data.frame(tbl)  
+print(tbl_df)
+
+install.packages("webshot2")
+library(webshot2)
+library(htmltools)
+
+html_file <- "data/plots/chol_table1_output.html"
+save_html(tbl, file = html_file)
+
+# Convert the HTML file to PNG
+webshot2::webshot(html_file, file = "data/plots/chol_table1_output.png", vwidth = 1200, vheight = 1000, zoom = 2)
