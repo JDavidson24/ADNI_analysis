@@ -24,7 +24,7 @@ library(splines)
 library(grid)
 
 # load adni
-# data(adnimerge)
+data(adnimerge)
 ## Load the datasets as csv files
 adnimerge <- read.csv("data/ADNIMERGE.csv")
 gdscale <- read.csv("data/GDSCALE.csv")
@@ -217,7 +217,7 @@ library(dplyr)
 # Fit the LMER model (Your original code)
 model <- lmer(
   mPACCdigit ~ year * DM_G4 + AGE + PTGENDER + PTMARRY + APOEe4_carrier + PTETHCAT + (1 | RID),
-  data = df_dm_cn
+  data = df_dm_mci
 )
 
 # Parametric bootstrap
@@ -252,10 +252,13 @@ results <- data.frame(
   p_value = pvals_robust
 )
 results
-
+t <- as.data.frame(results)
+t
+##write csv for bootstrap results
+write.csv(t, "data/plots/PACC_DM_bootstrap.csv")
 
 #### ANALYSIS ####
-PACC_DM <- lmer(mPACCdigit ~ year * DM_G4 + AGE + PTGENDER + PTMARRY + APOEe4_carrier + PTETHCAT + (1 | RID), data = df_dm_mci)
+PACC_DM <- lmer(mPACCdigit ~ year * DM_G4 + AGE + PTGENDER + PTMARRY + APOEe4_carrier + PTETHCAT + (1 | RID), data = df_dm_AD)
 
 summary(PACC_DM)
 
@@ -277,6 +280,12 @@ colnames(df_dm_cn)
 unique(df_dm_cn$PTRACCAT) #Race categories 
 unique((adnimerge$PTMARRY))
 
+library(ggplot2)
+library(gridExtra)
+anova_tbl <- as.data.frame(anova(m1, m2, m3, m4, m5, m6, m7))
+png("data/plots/dm_anova_results.png", width = 1200, height = 600, res = 150)
+gridExtra::grid.table(round(anova_tbl,5))
+dev.off()
 
 # Group 4 level comparisons (intecept)
 em_intercept <- emmeans(
@@ -308,23 +317,26 @@ library(broom.mixed)
 
 # Tidy fixed effects table
 tbl_fixed <- tidy(PACC_DM, effects = "fixed")
-
 # View table
 print(tbl_fixed)
 
 # Save as CSV
-write.csv(tbl_fixed, "data/plots/PACC_DM_fixed_effects.csv", row.names = FALSE)
+write.csv(tbl_fixed, "data/plots/PACC_DM_AD_fixed_effects.csv", row.names = FALSE)
 
 
 # Intercept emmeans
 em_int <- emmeans(PACC_CHOL, ~ DM_G4, at = list(year = 0))
 tbl_em_int <- summary(em_int)
-write.csv(tbl_em_int, "data/plots/PACC_DM_emmeans_intercept.csv", row.names = FALSE)
+write.csv(tbl_em_int, "data/plots/PACC_DM_AD_emmeans_intercept.csv", row.names = FALSE)
 
 # Slope emmeans
-em_slope <- emtrends(PACC_CHOL, ~ DM_G4, var = "year")
+# em_slope <- emtrends(PACC_CHOL, ~ DM_G4, var = "year")
 tbl_em_slope <- summary(em_slope)
-write.csv(tbl_em_slope, "data/plotsPACC_DM_emmeans_slope.csv", row.names = FALSE)
+write.csv(tbl_em_slope, "data/plots/PACC_DM_AD_emmeans_slope.csv", row.names = FALSE)
+tbl_em_slope_tukey <- pairs(em_slope, adjust = "tukey")
+write.csv(tbl_em_slope_tukey, "data/plots/PACC_DM_AD_emmeans_slope_tukey.csv", row.names = FALSE)
+
+
 
 
 ##### Cholesterol exposure dataset ###
@@ -415,7 +427,7 @@ df_chol_cn = df_chol %>% filter(DX.bl == "CN")
 #### Cholesterol ANALYSIS ####
 # Fit the LMER model
 model <- lmer(
-  mPACCdigit ~ year * Chol_G4 + AGE + PTGENDER + PTMARRY + APOEe4_carrier + PTETHCAT + (1 | RID),
+  mPACCdigit ~ year * Chol_G4 + AGE + PTGENDER + APOEe4_carrier + PTMARRY + PTETHCAT + (1 | RID),
   data = df_chol_cn
 )
 
@@ -450,10 +462,12 @@ results <- data.frame(
   CI_upper = ci_upper_direct,
   p_value = pvals_robust
 )
-results
+t <- as.data.frame(results)
+t
+##write csv for bootstrap results
+write.csv(t, "data/plots/PACC_CHOL_bootstrap.csv")
 
-
-PACC_CHOL <- lmer(mPACCdigit ~ year * Chol_G4 + AGE + PTGENDER + PTMARRY + PTETHCAT + (1 | RID), data = df_chol_mci)
+PACC_CHOL <- lmer(mPACCdigit ~ year * Chol_G4 + AGE + PTGENDER + APOEe4_carrier + PTMARRY + PTETHCAT + (1 | RID), data = df_chol_mci)
 
 summary(PACC_CHOL)
 
@@ -467,6 +481,14 @@ m6 <- lmer(mPACCdigit~ ns(year, df = 3) * Chol_G4 + AGE + PTGENDER + APOEe4_carr
 m7 <- lmer(mPACCdigit ~ ns(year, df = 3) * Chol_G4 + AGE + PTGENDER + APOEe4_carrier + PTMARRY + PTETHCAT + (1 | RID), data = df_chol_cn, REML = FALSE)
 
 anova(m1, m2, m3, m4, m5, m6, m7)
+
+##share anova as a png file for powerpoint
+library(ggplot2)
+library(gridExtra)
+anova_tbl <- as.data.frame(anova(m1, m2, m3, m4, m5, m6, m7))
+png("data/plots/chol_anova_results.png", width = 1200, height = 600, res = 150)
+gridExtra::grid.table(round(anova_tbl,5))
+dev.off()
 
 table(df_chol_cn$APOEe4_carrier)
 
@@ -499,23 +521,25 @@ library(broom.mixed)
 
 # Tidy fixed effects table
 tbl_fixed <- tidy(PACC_CHOL, effects = "fixed")
-
 # View table
-print(tbl_fixed)
-
 # Save as CSV
-write.csv(tbl_fixed, "PACC_CHOL_fixed_effects.csv", row.names = FALSE)
+write.csv(tbl_fixed, "data/plots/PACC_CHOL_fixed_effects.csv", row.names = FALSE)
 
 
 # Intercept emmeans
 em_int <- emmeans(PACC_CHOL, ~ Chol_G4, at = list(year = 0))
 tbl_em_int <- summary(em_int)
 write.csv(tbl_em_int, "data/plots/PACC_CHOL_emmeans_intercept.csv", row.names = FALSE)
-
 # Slope emmeans
-em_slope <- emtrends(PACC_CHOL, ~ Chol_G4, var = "year")
 tbl_em_slope <- summary(em_slope)
-write.csv(tbl_em_slope, "data/plotsPACC_CHOL_emmeans_slope.csv", row.names = FALSE)
+write.csv(tbl_em_slope, "data/plots/PACC_CHOL_emmeans_slope.csv", row.names = FALSE)
+tbl_em_slope_tukey <- pairs(em_slope, adjust = "tukey")
+write.csv(tbl_em_slope_tukey, "data/plots/PACC_CHOL_emmeans_slope_tukey.csv", row.names = FALSE)
+tbl_em_contrast <- contrast(em_slope, list("Interaction worse than additive" = c(1, -1, -1, 1)))
+write.csv(tbl_em_contrast, "data/plots/PACC_CHOL_emmeans_slope_contrast.csv", row.names = FALSE)
+
+
+
 
 
 
@@ -571,7 +595,7 @@ pvalue <- function(x, ...) {
 caption <- 'Study Characteristics Table'               
 
 #use table1 function to create the table
-tbl <- table1::table1(~ PTGENDER + PTETHCAT + PTEDUCAT + PTRACCAT + PTMARRY + AGE + DM_G4 | APOEe4_carrier, data = df_chol, render.missing = NULL, overall = c(Left = 'Total'), extra.col=list(`P_Value`=pvalue), groupspan=c(1, 1, 2), caption = caption, topclass="Rtable1-zebra")
+tbl <- table1::table1(~ PTGENDER + PTETHCAT + PTEDUCAT + PTRACCAT + PTMARRY + AGE + DM_G4 | APOEe4_carrier, data = df_dm, render.missing = NULL, overall = c(Left = 'Total'), extra.col=list(`P_Value`=pvalue), groupspan=c(1, 1, 2), caption = caption, topclass="Rtable1-zebra")
 
 # # ### turn table 1 into a data frame to save as a csv
 tbl_df <- as.data.frame(tbl)  
@@ -581,8 +605,8 @@ install.packages("webshot2")
 library(webshot2)
 library(htmltools)
 
-html_file <- "data/plots/chol_table1_output.html"
+html_file <- "data/plots/dm_table1_output.html"
 save_html(tbl, file = html_file)
 
 # Convert the HTML file to PNG
-webshot2::webshot(html_file, file = "data/plots/chol_table1_output.png", vwidth = 1200, vheight = 1000, zoom = 2)
+webshot2::webshot(html_file, file = "data/plots/dm_table1_output.png", vwidth = 1200, vheight = 1000, zoom = 2)
