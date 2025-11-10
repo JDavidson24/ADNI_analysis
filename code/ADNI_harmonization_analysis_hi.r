@@ -207,6 +207,11 @@ df_dm_ad = df_dm %>% filter(DX.bl == "AD")
 df_dm_mci = df_dm %>% filter(DX.bl %in% c("EMCI", "LMCI", 'SMC'))
 df_dm_cn = df_dm %>% filter(DX.bl == "CN")
 
+write.csv(df_dm_cn, "data/dm/PACC_DM_cn_dataset.csv")
+write.csv(df_dm_mci, "data/dm/PACC_DM_mci_dataset.csv")
+write.csv(df_dm_ad, "data/dm/PACC_DM_ad_dataset.csv")
+write.csv(df_dm, "data/dm/PACC_DM_full_dataset.csv")
+
 ##bootstrap the Data
 library(lme4)
 install.packages("lmeresampler")
@@ -217,7 +222,7 @@ library(dplyr)
 # Fit the LMER model (Your original code)
 model <- lmer(
   mPACCdigit ~ year * DM_G4 + AGE + PTGENDER + PTMARRY + APOEe4_carrier + PTETHCAT + (1 | RID),
-  data = df_dm_mci
+  data = df_dm_cn
 )
 
 # Parametric bootstrap
@@ -255,22 +260,22 @@ results
 t <- as.data.frame(results)
 t
 ##write csv for bootstrap results
-write.csv(t, "data/plots/PACC_DM_bootstrap.csv")
+write.csv(t, "data/plots/PACC_DM_cn_bootstrap.csv")
 
 #### ANALYSIS ####
-PACC_DM <- lmer(mPACCdigit ~ year * DM_G4 + AGE + PTGENDER + PTMARRY + APOEe4_carrier + PTETHCAT + (1 | RID), data = df_dm_AD)
+PACC_DM <- lmer(mPACCdigit ~ year * DM_G4 + AGE + PTGENDER + PTMARRY + APOEe4_carrier + PTETHCAT + (1 | RID), data = df_dm_cn)
 
 summary(PACC_DM)
 
 
 ###Perform a model comparison to see the effect of adding each covariate step by step
-m1 <- lmer(mPACCdigit ~ year + (1 | RID), data = df_dm_cn, REML = FALSE)
-m2 <- lmer(mPACCdigit ~ year * DM_G4 + (1 | RID), data = df_dm_cn, REML = FALSE)
-m3 <- lmer(mPACCdigit ~ year * DM_G4 + AGE + (1 | RID), data = df_dm_cn, REML = FALSE)
-m4 <- lmer(mPACCdigit ~ year * DM_G4 + AGE + PTGENDER + (1 | RID), data = df_dm_cn, REML = FALSE)
-m5 <- lmer(mPACCdigit ~ year * DM_G4 + AGE + PTGENDER + APOEe4_carrier + (1 | RID), data = df_dm_cn, REML = FALSE)
-m6 <- lmer(mPACCdigit~ year * DM_G4 + AGE + PTGENDER + APOEe4_carrier + PTMARRY + (1 | RID), data = df_dm_cn, REML = FALSE)
-m7 <- lmer(mPACCdigit ~ year * DM_G4 + AGE + PTGENDER + APOEe4_carrier + PTMARRY + PTETHCAT + (1 | RID), data = df_dm_cn, REML = FALSE)
+m1 <- lmer(mPACCdigit ~ year + (1 | RID), data = df_dm_ad, REML = FALSE)
+m2 <- lmer(mPACCdigit ~ year * DM_G4 + (1 | RID), data = df_dm_ad, REML = FALSE)
+m3 <- lmer(mPACCdigit ~ year * DM_G4 + AGE + (1 | RID), data = df_dm_ad, REML = FALSE)
+m4 <- lmer(mPACCdigit ~ year * DM_G4 + AGE + PTGENDER + (1 | RID), data = df_dm_ad, REML = FALSE)
+m5 <- lmer(mPACCdigit ~ year * DM_G4 + AGE + PTGENDER + APOEe4_carrier + (1 | RID), data = df_dm_ad, REML = FALSE)
+m6 <- lmer(mPACCdigit~ year * DM_G4 + AGE + PTGENDER + APOEe4_carrier + PTMARRY + (1 | RID), data = df_dm_ad, REML = FALSE)
+m7 <- lmer(mPACCdigit ~ year * DM_G4 + AGE + PTGENDER + APOEe4_carrier + PTMARRY + PTETHCAT + (1 | RID), data = df_dm_ad, REML = FALSE)
 
 anova(m1, m2, m3, m4, m5, m6, m7)
 
@@ -278,12 +283,12 @@ anova(m1, m2, m3, m4, m5, m6, m7)
 table(df_dm_cn$APOEe4_carrier)
 colnames(df_dm_cn)
 unique(df_dm_cn$PTRACCAT) #Race categories 
-unique((adnimerge$PTMARRY))
+length(unique(adnimerge$RID))
 
 library(ggplot2)
 library(gridExtra)
 anova_tbl <- as.data.frame(anova(m1, m2, m3, m4, m5, m6, m7))
-png("data/plots/dm_anova_results.png", width = 1200, height = 600, res = 150)
+png("data/plots/dm_ad_anova_results.png", width = 1200, height = 600, res = 150)
 gridExtra::grid.table(round(anova_tbl,5))
 dev.off()
 
@@ -321,20 +326,20 @@ tbl_fixed <- tidy(PACC_DM, effects = "fixed")
 print(tbl_fixed)
 
 # Save as CSV
-write.csv(tbl_fixed, "data/plots/PACC_DM_AD_fixed_effects.csv", row.names = FALSE)
+write.csv(tbl_fixed, "data/plots/PACC_DM_cn_fixed_effects.csv", row.names = FALSE)
 
 
 # Intercept emmeans
-em_int <- emmeans(PACC_CHOL, ~ DM_G4, at = list(year = 0))
+# em_int <- emmeans(PACC_CHOL, ~ DM_G4, at = list(year = 0))
 tbl_em_int <- summary(em_int)
-write.csv(tbl_em_int, "data/plots/PACC_DM_AD_emmeans_intercept.csv", row.names = FALSE)
+write.csv(tbl_em_int, "data/plots/PACC_DM_cn_emmeans_intercept.csv", row.names = FALSE)
 
 # Slope emmeans
 # em_slope <- emtrends(PACC_CHOL, ~ DM_G4, var = "year")
 tbl_em_slope <- summary(em_slope)
-write.csv(tbl_em_slope, "data/plots/PACC_DM_AD_emmeans_slope.csv", row.names = FALSE)
+write.csv(tbl_em_slope, "data/plots/PACC_DM_cn_emmeans_slope.csv", row.names = FALSE)
 tbl_em_slope_tukey <- pairs(em_slope, adjust = "tukey")
-write.csv(tbl_em_slope_tukey, "data/plots/PACC_DM_AD_emmeans_slope_tukey.csv", row.names = FALSE)
+write.csv(tbl_em_slope_tukey, "data/plots/PACC_DM_cn_emmeans_slope_tukey.csv", row.names = FALSE)
 
 
 
@@ -417,11 +422,16 @@ df_chol = df %>% filter(RID %in% id_all) %>%
   )
 
 
-skim(df_dm) ###6314 rows will be in the analysis
+skim(df_chol) ###6314 rows will be in the analysis
 
 df_chol_ad = df_chol %>% filter(DX.bl == "AD")
 df_chol_mci = df_chol %>% filter(DX.bl %in% c("EMCI", "LMCI", 'SMC'))
 df_chol_cn = df_chol %>% filter(DX.bl == "CN")
+
+write.csv(df_chol_cn, "data/chol/PACC_chol_cn_dataset.csv")
+write.csv(df_chol_mci, "data/chol/PACC_chol_mci_dataset.csv")
+write.csv(df_chol_ad, "data/chol/PACC_chol_ad_dataset.csv")
+write.csv(df_chol, "data/chol/PACC_chol_full_dataset.csv")
 
 
 #### Cholesterol ANALYSIS ####
@@ -465,20 +475,20 @@ results <- data.frame(
 t <- as.data.frame(results)
 t
 ##write csv for bootstrap results
-write.csv(t, "data/plots/PACC_CHOL_bootstrap.csv")
+write.csv(t, "data/plots/chol/PACC_CHOL_cn_bootstrap.csv")
 
-PACC_CHOL <- lmer(mPACCdigit ~ year * Chol_G4 + AGE + PTGENDER + APOEe4_carrier + PTMARRY + PTETHCAT + (1 | RID), data = df_chol_mci)
+PACC_CHOL <- lmer(mPACCdigit ~ year * Chol_G4 + AGE + PTGENDER + APOEe4_carrier + PTMARRY + PTETHCAT + (1 | RID), data = df_chol_cn)
 
 summary(PACC_CHOL)
 
 ###Perform a model comparison to see the effect of adding each covariate step by step
-m1 <- lmer(mPACCdigit ~ ns(year, df = 3) + (1 | RID), data = df_chol_cn, REML = FALSE)
-m2 <- lmer(mPACCdigit ~ ns(year, df = 3) * Chol_G4 + (1 | RID), data = df_chol_cn, REML = FALSE)
-m3 <- lmer(mPACCdigit ~ ns(year, df = 3) * Chol_G4 + AGE + (1 | RID), data = df_chol_cn, REML = FALSE)
-m4 <- lmer(mPACCdigit ~ ns(year, df = 3) * Chol_G4 + AGE + PTGENDER + (1 | RID), data = df_chol_cn, REML = FALSE)
-m5 <- lmer(mPACCdigit ~ ns(year, df = 3) * Chol_G4 + AGE + PTGENDER + APOEe4_carrier + (1 | RID), data = df_chol_cn, REML = FALSE)
-m6 <- lmer(mPACCdigit~ ns(year, df = 3) * Chol_G4 + AGE + PTGENDER + APOEe4_carrier + PTMARRY + (1 | RID), data = df_chol_cn, REML = FALSE)
-m7 <- lmer(mPACCdigit ~ ns(year, df = 3) * Chol_G4 + AGE + PTGENDER + APOEe4_carrier + PTMARRY + PTETHCAT + (1 | RID), data = df_chol_cn, REML = FALSE)
+m1 <- lmer(mPACCdigit ~ ns(year, df = 3) + (1 | RID), data = df_chol_ad, REML = FALSE)
+m2 <- lmer(mPACCdigit ~ ns(year, df = 3) * Chol_G4 + (1 | RID), data = df_chol_ad, REML = FALSE)
+m3 <- lmer(mPACCdigit ~ ns(year, df = 3) * Chol_G4 + AGE + (1 | RID), data = df_chol_ad, REML = FALSE)
+m4 <- lmer(mPACCdigit ~ ns(year, df = 3) * Chol_G4 + AGE + PTGENDER + (1 | RID), data = df_chol_ad, REML = FALSE)
+m5 <- lmer(mPACCdigit ~ ns(year, df = 3) * Chol_G4 + AGE + PTGENDER + APOEe4_carrier + (1 | RID), data = df_chol_ad, REML = FALSE)
+m6 <- lmer(mPACCdigit~ ns(year, df = 3) * Chol_G4 + AGE + PTGENDER + APOEe4_carrier + PTMARRY + (1 | RID), data = df_chol_ad, REML = FALSE)
+m7 <- lmer(mPACCdigit ~ ns(year, df = 3) * Chol_G4 + AGE + PTGENDER + APOEe4_carrier + PTMARRY + PTETHCAT + (1 | RID), data = df_chol_ad, REML = FALSE)
 
 anova(m1, m2, m3, m4, m5, m6, m7)
 
@@ -486,7 +496,7 @@ anova(m1, m2, m3, m4, m5, m6, m7)
 library(ggplot2)
 library(gridExtra)
 anova_tbl <- as.data.frame(anova(m1, m2, m3, m4, m5, m6, m7))
-png("data/plots/chol_anova_results.png", width = 1200, height = 600, res = 150)
+png("data/plots/chol/chol_ad_anova_results.png", width = 1200, height = 600, res = 150)
 gridExtra::grid.table(round(anova_tbl,5))
 dev.off()
 
@@ -523,20 +533,20 @@ library(broom.mixed)
 tbl_fixed <- tidy(PACC_CHOL, effects = "fixed")
 # View table
 # Save as CSV
-write.csv(tbl_fixed, "data/plots/PACC_CHOL_fixed_effects.csv", row.names = FALSE)
+write.csv(tbl_fixed, "data/plots/chol/PACC_CHOL_cn_fixed_effects.csv", row.names = FALSE)
 
 
 # Intercept emmeans
 em_int <- emmeans(PACC_CHOL, ~ Chol_G4, at = list(year = 0))
 tbl_em_int <- summary(em_int)
-write.csv(tbl_em_int, "data/plots/PACC_CHOL_emmeans_intercept.csv", row.names = FALSE)
+write.csv(tbl_em_int, "data/plots/chol/PACC_CHOL_cn_emmeans_intercept.csv", row.names = FALSE)
 # Slope emmeans
 tbl_em_slope <- summary(em_slope)
-write.csv(tbl_em_slope, "data/plots/PACC_CHOL_emmeans_slope.csv", row.names = FALSE)
+write.csv(tbl_em_slope, "data/plots/chol/PACC_CHOL_cn_emmeans_slope.csv", row.names = FALSE)
 tbl_em_slope_tukey <- pairs(em_slope, adjust = "tukey")
-write.csv(tbl_em_slope_tukey, "data/plots/PACC_CHOL_emmeans_slope_tukey.csv", row.names = FALSE)
+write.csv(tbl_em_slope_tukey, "data/plots/chol/PACC_CHOL_cn_emmeans_slope_tukey.csv", row.names = FALSE)
 tbl_em_contrast <- contrast(em_slope, list("Interaction worse than additive" = c(1, -1, -1, 1)))
-write.csv(tbl_em_contrast, "data/plots/PACC_CHOL_emmeans_slope_contrast.csv", row.names = FALSE)
+write.csv(tbl_em_contrast, "data/plots/chol/PACC_CHOL_cn_emmeans_slope_contrast.csv", row.names = FALSE)
 
 
 
